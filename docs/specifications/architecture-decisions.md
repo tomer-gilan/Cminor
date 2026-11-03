@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-A log of significant design decisions for the C~~ compiler: what was decided, why, and what it implies.
+A log of significant design decisions for the Cminor compiler: what was decided, why, and what it implies.
 Entries are append-only. To change a decision, add a new entry that supersedes the old one and mark the old one's status accordingly.
 
 Format per entry: **Status** (Proposed / Accepted / Superseded by ADR-NNN), **Date**, **Context**, **Decision**, **Consequences**.
@@ -94,7 +94,7 @@ The compiler emits **x86-64 assembly itself**, with no LLVM or QBE: AST to assem
 
 ### Consequences
 - Register allocation, instruction selection and the System V calling convention are the compiler's own work.
-- `gcc -O0 -S` output is AT&T too, so it can be diffed against C~~'s output directly.
+- `gcc -O0 -S` output is AT&T too, so it can be diffed against Cminor's output directly.
 - Operand order is source, destination (`movl $1, %eax`), the reverse of the Intel manuals. Keep that in mind when reading the Intel SDM.
 - Type sizes and the rest of the data model follow the ABI: see `implementation-defined.md`.
 
@@ -109,7 +109,7 @@ The compiler emits **x86-64 assembly itself**, with no LLVM or QBE: AST to assem
 Translation phase 4 (directives and macro expansion) is a separate, largely independent text-processing layer. C programs normally get library declarations through `#include`.
 
 ### Decision
-C~~ has **no preprocessor**. The input is a single, already-complete translation unit. The preprocessing punctuators, header names and preprocessing numbers are out of the subset (`SUBSET.md`).
+Cminor has **no preprocessor**. The input is a single, already-complete translation unit. The preprocessing punctuators, header names and preprocessing numbers are out of the subset (`SUBSET.md`).
 
 ### Consequences
 - Test programs declare the libc functions they use by hand (`int puts(char* s);`).
@@ -269,7 +269,7 @@ All allocation goes through `xmalloc` / `xrealloc` (and maybe `xstrdup`) wrapper
 
 This only works if the punctuator set is **prefix-closed**: every prefix of every punctuator is itself a punctuator. In particular, every character that appears in a punctuator is a one-character punctuator.
 
-The C~~ punctuator set (`SUBSET.md`, A.1.7) is prefix-closed today: `<<` `>>` `<=` `>=` `==` `!=` `&&` `||` are the only multi-character punctuators, and `<` `>` `=` `!` `&` `|` are all in the set.
+The Cminor punctuator set (`SUBSET.md`, A.1.7) is prefix-closed today: `<<` `>>` `<=` `>=` `==` `!=` `&&` `||` are the only multi-character punctuators, and `<` `>` `=` `!` `&` `|` are all in the set.
 
 ### Decision
 Keep the one-character-at-a-time munch, and treat "the punctuator set is prefix-closed" as an **invariant** of the lexer. It isn't checked in code yet, and that is accepted for now.
@@ -385,7 +385,7 @@ Nodes store the **interned `int` id** (e.g. `name_identifier_id`), never a strin
 ### Context
 Declarations carry types, some of them nested (`int *a[3]`: array of 3 pointers to `int`). The parser can build a
 `Type` while it parses the declarator, or store the declarator syntax as written and leave the interpretation to sema.
-C~~ has no `typedef` (`SUBSET.md`), so the syntax alone always determines the type.
+Cminor has no `typedef` (`SUBSET.md`), so the syntax alone always determines the type.
 
 ### Decision
 The parser builds `Type`s directly. There's one `Type` representation (`int`, `char`, `void`, pointer-to, array-of,

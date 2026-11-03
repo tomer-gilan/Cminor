@@ -1,7 +1,7 @@
 #!/bin/sh
 # Written by Claude on 20-Oct-26.
 #
-# End-to-end test of one C~~ program (codegen-roadmap.md, Step 0d): compiles it with the C~~ compiler, assembles and
+# End-to-end test of one Cminor program (codegen-roadmap.md, Step 0d): compiles it with the Cminor compiler, assembles and
 # links the .s with gcc, runs the program, and compares its exit status with the one in the program's .exit file.
 #
 # Usage: tests/run_e2e.sh <compiler> <program.c> <work-dir>

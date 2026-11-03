@@ -1,6 +1,6 @@
 # Testing Roadmap
 
-The step-by-step plan for building the C~~ test suite. The background, structure and decisions behind it are
+The step-by-step plan for building the Cminor test suite. The background, structure and decisions behind it are
 in [](../todo/testing.md).
 
 Built step by step. Each step ends in a state that works and can be committed.

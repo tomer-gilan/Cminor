@@ -1,6 +1,6 @@
 # Semantic Analysis Roadmap
 
-The step-by-step plan for C~~'s semantic analysis ("sema"): the parser's AST in; a verdict and a side table out, with
+The step-by-step plan for Cminor's semantic analysis ("sema"): the parser's AST in; a verdict and a side table out, with
 the AST itself untouched (ADR-023). Sema enforces the rules the grammar can't express: every name is declared, types
 fit together, the left side of `=` is something that can be assigned to. It also records what later stages need:
 which declaration each name refers to, and the type of every expression.
@@ -42,7 +42,7 @@ Copied from `parser-roadmap.md`. The list must stay identical across the stage r
 Everything comes from [`SUBSET.md`](../specifications/SUBSET.md) and
 [`implementation-defined.md`](../specifications/implementation-defined.md). The rules sema enforces are mostly C11's
 **constraints** (the "Constraints" paragraphs of §6.5–§6.9): a constraint violation needs a diagnostic, which is
-exactly sema's job. C~~ may reject more than C does, but it never changes what an accepted program means
+exactly sema's job. Cminor may reject more than C does, but it never changes what an accepted program means
 (`implementation-defined.md`, "Functions").
 
 ### Light slices
@@ -91,7 +91,7 @@ build and in the sanitizer build.
   (`return`) and §6.9 (external definitions).
 - [x] Be able to answer:
     - What is an lvalue? Why is `x = 1` fine and `x + 1 = 1` not, when both left sides have type `int`?
-    - When does an array become a pointer to its first element, and in which two places doesn't it (in C~~)?
+    - When does an array become a pointer to its first element, and in which two places doesn't it (in Cminor)?
     - In `int x = x;`, which `x` is on the right? Why?
     - Why does `char c; c + c` have type `int`?
     - What's the difference between a *declaration* and a *definition* of a function? Which one can appear twice?
@@ -149,7 +149,7 @@ Each step lists what sema checks, what it records, the tests, and the gotchas.
 
 **Step 3: Arithmetic**
 
-- [ ] Record: `* / % + -` on two integers have type `int` (the usual arithmetic conversions, which in C~~ always end
+- [ ] Record: `* / % + -` on two integers have type `int` (the usual arithmetic conversions, which in Cminor always end
   at `int`).
 - [ ] Tests: the types of `1 + 2 * 3` and `-1 * -2`.
 - Gotchas: `1 / 0` is accepted: division by zero is undefined at run time, not a constraint violation. A warning for a
@@ -228,8 +228,8 @@ Each step lists what sema checks, what it records, the tests, and the gotchas.
 - [ ] Error tests: `int g = 1 + 2;`, `int g = x;`, `int *gp = &x;`, `int g = "hi";`, `int x = 1; int x = 2;`,
   `int x; char x;`.
 - [ ] Tests: a global used and assigned inside functions; a local that shadows a global.
-- Gotchas: `int x; int x;` at file scope is legal C (tentative definitions). Decide whether C~~ accepts it as C does,
-  or rejects it: rejecting is allowed, since C~~ may reject more than C, but never change a program's meaning.
+- Gotchas: `int x; int x;` at file scope is legal C (tentative definitions). Decide whether Cminor accepts it as C does,
+  or rejects it: rejecting is allowed, since Cminor may reject more than C, but never change a program's meaning.
 
 **Step 11: Pointers**
 
@@ -244,7 +244,7 @@ Each step lists what sema checks, what it records, the tests, and the gotchas.
   `int *p; char *q = p;`.
 - [ ] Tests: `int *p = &x; *p = 3;`, `**pp`, `p = 0`, `if (p)`, `!p`, `void *v = p; p = v;`.
 - Gotcha: `p = 0` is legal but `p = 1` isn't. Only an integer constant *expression* with value 0 is a null pointer
-  constant, and in C~~ that means the token `0` (maybe with parentheses around it), since there's no constant folding.
+  constant, and in Cminor that means the token `0` (maybe with parentheses around it), since there's no constant folding.
 
 **Step 12: Arrays**
 
@@ -257,7 +257,7 @@ Each step lists what sema checks, what it records, the tests, and the gotchas.
 - [ ] Error tests: `int a[0];`, `a = b` with two arrays, `a[p]` with two pointers, `int a[3] = 1;` (no brace
   initializers in v1), `x[1]` on an `int`.
 - [ ] Tests: `a[1] = 5`, `i[a]`, `a[i][j]` (the element is itself an array, which decays again), `int *p = a;`.
-- Gotcha: `&a` has type pointer-to-array-of-3-`int`, which C~~ can't even spell (no parenthesized declarators), so
+- Gotcha: `&a` has type pointer-to-array-of-3-`int`, which Cminor can't even spell (no parenthesized declarators), so
   `int *p = &a;` is an incompatible pointer assignment. It's an error, even though the address is the same.
 
 **Step 13: `char`, character constants, string literals**
@@ -284,7 +284,7 @@ Each step lists what sema checks, what it records, the tests, and the gotchas.
 - [ ] Tests: `sizeof x`, `sizeof *p`, `sizeof a`, `sizeof a[0]`, `sizeof (x)`, `sizeof sizeof x` (4), `sizeof c` with
   `char c` (1), `sizeof f()` with an `int`-returning `f` (4, and `f` is never called: check that in the end-to-end
   test).
-- Gotcha: `sizeof c - 2 < 0` is true in C~~ and false in C (`implementation-defined.md`, "Operators"). It's the one
+- Gotcha: `sizeof c - 2 < 0` is true in Cminor and false in C (`implementation-defined.md`, "Operators"). It's the one
   documented difference, so test it explicitly.
 
 ---

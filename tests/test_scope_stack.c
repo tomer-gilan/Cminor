@@ -8,7 +8,7 @@
 #include "ScopeStack.h"
 
 // The stack only stores and compares Symbol pointers, so the symbols are distinct static objects, zero-initialized and
-// with no fields named: the tests don't break when Symbol's fields change. Each test's comment shows the C~~ code whose
+// with no fields named: the tests don't break when Symbol's fields change. Each test's comment shows the Cminor code whose
 // scopes it plays out.
 
 enum {

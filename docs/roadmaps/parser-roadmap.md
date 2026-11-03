@@ -1,6 +1,6 @@
 # Parser Roadmap
 
-The step-by-step plan for the C~~ parser: tokens in, AST out. Start it once [`testing-roadmap.md`](testing-roadmap.md)
+The step-by-step plan for the Cminor parser: tokens in, AST out. Start it once [`testing-roadmap.md`](testing-roadmap.md)
 is finished.
 
 ---
@@ -85,7 +85,7 @@ questions.
 **Step 0b: The grammar (`SUBSET.md`, A.2)**
 
 - [x] Write A.2.1 (expressions), A.2.2 (declarations), A.2.3 (statements) and A.2.4 (external definitions) as a trimmed
-  EBNF of what C~~ accepts, starting from the standard's Annex A (see [`annex-a-breakdown.md`](../specifications/annex-a-breakdown.md)).
+  EBNF of what Cminor accepts, starting from the standard's Annex A (see [`annex-a-breakdown.md`](../specifications/annex-a-breakdown.md)).
 - [x] Settle the open decisions below, and record each one in `SUBSET.md` or `implementation-defined.md` (2026-10-13).
 
 Decisions (2026-10-13; the details are in `SUBSET.md` A.2):

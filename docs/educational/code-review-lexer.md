@@ -1,4 +1,4 @@
-# C~~ Code Review: Lexer and Supporting Modules
+# Cminor Code Review: Lexer and Supporting Modules
 
 *Reviewed 2026-09-27. Covers everything under `git_code/` (Lexer, Token, Diagnostic, DataStructures, Utils, Globals, main).*
 
@@ -355,7 +355,7 @@ Trace `'a'`:
 The same "store the closing delimiter" mistake exists in the string muncher ([Lexer.c:415–417](git_code/Lexer.c#L415)): `"abc"` gets interned as `abc` + byte `0xA7` (a structural `"`).
 
 ### B.1.5 Wrong escape values ([Lexer.c:288–299](git_code/Lexer.c#L288))
-`\n` → `0x10`, `\v` → `0x11`, `\f` → `0x12`, `\r` → `0x13`. Those are **decimal** 10–13 written with a **hex** prefix. The correct values are `0x0A`, `0x0B`, `0x0C`, `0x0D`. (`\a`, `\b`, `\t` happen to be right because 7, 8 and 9 are the same in both bases.) Every `printf("hi\n")` compiled by C~~ would print a DLE control character instead of a newline.
+`\n` → `0x10`, `\v` → `0x11`, `\f` → `0x12`, `\r` → `0x13`. Those are **decimal** 10–13 written with a **hex** prefix. The correct values are `0x0A`, `0x0B`, `0x0C`, `0x0D`. (`\a`, `\b`, `\t` happen to be right because 7, 8 and 9 are the same in both bases.) Every `printf("hi\n")` compiled by Cminor would print a DLE control character instead of a newline.
 
 ### B.1.6 Unterminated literal → infinite loop with uninitialised memory ([Lexer.c:256–262](git_code/Lexer.c#L256))
 When `peek_escaped_internal` sees EOS (`0xFF`, which has the MSB set), it takes the "structural character" branch, issues a diagnostic, and **returns 0 without writing `*ptr`**. So:

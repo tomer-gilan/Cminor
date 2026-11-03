@@ -17,8 +17,8 @@ roadmap Step 0b).
 - **SUBSET.md says** comes from `SUBSET.md`: ✅ in, ❌ out, ⚠️ partly, v2 = listed as a v2 candidate.
 - **slice** is every slice (from the slice table in `parser-roadmap.md`) that adds to the row, one color per digit:
   0 ⚪, 1 ⚫, 2 🟡, 3 🟢, 4 🔴, 5 🟠, 6 🩶, 7 🟤, 8 🔵, 9 🟨. So ⚫🟡#12 is slice 12. A pass-through row gets the first
-  slice where both its levels exist. Empty means not in C~~ v1.
-- C~~'s lexer has no token for `.`, `->`, `++`, `--`, `?`, `:`, `...` or any compound assignment. `x -= 1` lexes as
+  slice where both its levels exist. Empty means not in Cminor v1.
+- Cminor's lexer has no token for `.`, `->`, `++`, `--`, `?`, `:`, `...` or any compound assignment. `x -= 1` lexes as
   `x - = 1`, and `p->x` as `p - > x`.
 
 ## A.2.1 Expressions
@@ -30,7 +30,7 @@ The atoms of an expression: names, literals, and parenthesized expressions.
 | rule                            | example     | gotchas                                                                                                          | SUBSET.md says | slice       |
 | ------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- | -------------- | ----------- |
 | *identifier*                    | `x`         | Whether `x` is declared is sema's question, not the parser's.                                                    | ✅              | 🩶#6        |
-| *constant*                      | `42`, `'a'` | In A.1, *constant* also covers floating and enumeration constants. C~~ has only integer and character constants. | ✅              | ⚫#1, ⚫🟢#13 |
+| *constant*                      | `42`, `'a'` | In A.1, *constant* also covers floating and enumeration constants. Cminor has only integer and character constants. | ✅              | ⚫#1, ⚫🟢#13 |
 | *string-literal*                | `"hi"`      | Its type is `char[N]`, which decays to `char *` in most uses.                                                    | ✅              | ⚫🟢#13      |
 | `(`[expression](#expression)`)` | `(a + b)`   | The parentheses only shape the tree: no node of their own is needed.                                             | ✅              | 🟡#2        |
 ### postfix-expression
@@ -63,7 +63,7 @@ An operand with prefix operators, and `sizeof`.
 | `--` [unary-expression](#unary-expression)                            | `--i`                     | v1 lexes it as two `-`, and the touching rule makes `--x` a syntax error; `- -x` is fine. v2 adds the `--` token. | v2 |             |
 | [unary-operator](#unary-operator) [cast-expression](#cast-expression) | `-x`, `*p`, `!*p`         | The operand is a cast-expression so that `-(int)c` works. Without casts it's the same as a unary-expression. Right-recursive: `- -x` nests. | ✅              | 🟡#2, ⚫⚫#11 |
 | `sizeof` [unary-expression](#unary-expression)                        | `sizeof x`, `sizeof a[0]` | `sizeof (x)` is this alternative: `(x)` is a primary-expression. The operand isn't evaluated, and arrays don't decay.                       | ✅              | ⚫🔴#14      |
-| `sizeof` `(` [type-name](#type-name) `)`                              | `sizeof(int)`             | After `sizeof (`, the next token decides: a type keyword means this alternative. In C~~ v1 it's a syntax error.                             | v2             |             |
+| `sizeof` `(` [type-name](#type-name) `)`                              | `sizeof(int)`             | After `sizeof (`, the next token decides: a type keyword means this alternative. In Cminor v1 it's a syntax error.                             | v2             |             |
 
 
 ### unary-operator
@@ -206,7 +206,7 @@ Introduces names (variables, functions) and their types.
 
 | rule                                                                                                              | example          | gotchas                                                                                                                            | SUBSET.md says | slice                   |
 | ----------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
-| [declaration-specifiers](#declaration-specifiers) [init-declarator-list](#init-declarator-list)<sub>opt</sub> `;` | `int a, *p = 0;` | With the list omitted, `int;` is legal C (a useless declaration, usually a warning). SUBSET.md doesn't say whether C~~ accepts it. | ✅              | 🩶#6,<br>🟨#9,<br>⚫⚪#10 |
+| [declaration-specifiers](#declaration-specifiers) [init-declarator-list](#init-declarator-list)<sub>opt</sub> `;` | `int a, *p = 0;` | With the list omitted, `int;` is legal C (a useless declaration, usually a warning). SUBSET.md doesn't say whether Cminor accepts it. | ✅              | 🩶#6,<br>🟨#9,<br>⚫⚪#10 |
 
 
 ### declaration-specifiers
@@ -215,7 +215,7 @@ The words before the declarators: type, storage class, qualifiers.
 
 | rule                                                                                                        | example           | gotchas                                                                                                              | SUBSET.md says | slice |
 | ----------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ----- |
-| [type-specifier](#type-specifier) [declaration-specifiers](#declaration-specifiers)<sub>opt</sub>           | `int`             | In C, `unsigned long int` is three specifiers combined. In C~~ there's exactly one, so the recursion is never taken. | ⚠️ exactly one | ⚫#1   |
+| [type-specifier](#type-specifier) [declaration-specifiers](#declaration-specifiers)<sub>opt</sub>           | `int`             | In C, `unsigned long int` is three specifiers combined. In Cminor there's exactly one, so the recursion is never taken. | ⚠️ exactly one | ⚫#1   |
 ### init-declarator-list
 
 The comma-separated declarators of one declaration.
@@ -232,7 +232,7 @@ One declarator, with an optional initializer.
 | rule | example | gotchas | SUBSET.md says | slice |
 |---|---|---|---|---|
 | [declarator](#declarator) | `*p` | | ✅ | 🩶#6 |
-| [declarator](#declarator) `=` [initializer](#initializer) | `x = 5` | The grammar allows any expression. C~~'s limit on global initializers is a check, not a grammar rule. | ✅ | 🩶#6, ⚫⚪#10 |
+| [declarator](#declarator) `=` [initializer](#initializer) | `x = 5` | The grammar allows any expression. Cminor's limit on global initializers is a check, not a grammar rule. | ✅ | 🩶#6, ⚫⚪#10 |
 
 ### type-specifier
 
@@ -261,15 +261,15 @@ A declarator without its leading `*`s: the name and its `[]` and `()` suffixes.
 | rule                                                                                                                                                                    | example                        | gotchas                                                                                                                                     | SUBSET.md says               | slice     |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------- |
 | *identifier*                                                                                                                                                            | `x`                            |                                                                                                                                             | ✅                            | ⚫#1, 🩶#6 |
-| [direct-declarator](#direct-declarator) `[` [type-qualifier-list](#type-qualifier-list)<sub>opt</sub> [assignment-expression](#assignment-expression)<sub>opt</sub> `]` | `a[3]`, `m[2][3]`              | Left-recursive: suffixes loop. In C~~ the size is required, and is one integer-constant token greater than 0.                               | ⚠️ `[N]` only                | ⚫🟡#12    |
+| [direct-declarator](#direct-declarator) `[` [type-qualifier-list](#type-qualifier-list)<sub>opt</sub> [assignment-expression](#assignment-expression)<sub>opt</sub> `]` | `a[3]`, `m[2][3]`              | Left-recursive: suffixes loop. In Cminor the size is required, and is one integer-constant token greater than 0.                               | ⚠️ `[N]` only                | ⚫🟡#12    |
 | [direct-declarator](#direct-declarator) `(` [parameter-type-list](#parameter-type-list) `)`                                                                             | `f(int x, char *s)`, `f(void)` | The grammar allows `f(void)[3]` (a function returning an array) and `a[3](void)`: both are errors that a check must catch, not the grammar. | ✅                            | ⚫#1, 🟨#9 |
-| [direct-declarator](#direct-declarator) `(` [identifier-list](#identifier-list)<sub>opt</sub> `)`                                                                       | `f()`, K&R `f(a, b)`           | In C11, `()` means "no prototype" (K&R style). C~~ accepts only the empty `()` and treats it as `(void)` (C23's rule).                      | ⚠️ `()` only, means `(void)` | 🟨#9      |
+| [direct-declarator](#direct-declarator) `(` [identifier-list](#identifier-list)<sub>opt</sub> `)`                                                                       | `f()`, K&R `f(a, b)`           | In C11, `()` means "no prototype" (K&R style). Cminor accepts only the empty `()` and treats it as `(void)` (C23's rule).                      | ⚠️ `()` only, means `(void)` | 🟨#9      |
 ### pointer
 One or more `*`s, each with optional qualifiers.
 
 | rule | example | gotchas | SUBSET.md says | slice |
 |---|---|---|---|---|
-| `*` [type-qualifier-list](#type-qualifier-list)<sub>opt</sub> | `*p` | No qualifiers in C~~, so it's just `*`. | ✅ | ⚫⚫#11 |
+| `*` [type-qualifier-list](#type-qualifier-list)<sub>opt</sub> | `*p` | No qualifiers in Cminor, so it's just `*`. | ✅ | ⚫⚫#11 |
 | `*` [type-qualifier-list](#type-qualifier-list)<sub>opt</sub> [pointer](#pointer) | `**pp` | Right-recursive, or a loop that counts the `*`s. | ✅ | ⚫⚫#11 |
 ### parameter-type-list
 A function's parameters, with an optional trailing `...`.
@@ -305,7 +305,7 @@ A declarator without the name: only `*`, `[]` and `()`.
 
 | rule                                                                                        | example                 | gotchas                                      | SUBSET.md says        | slice |
 | ------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------- | --------------------- | ----- |
-| [pointer](#pointer)                                                                         | `*` in `int f(char *);` | C~~ needs it for unnamed pointer parameters. | ⚠️ unnamed parameters | ⚫⚫#11 |
+| [pointer](#pointer)                                                                         | `*` in `int f(char *);` | Cminor needs it for unnamed pointer parameters. | ⚠️ unnamed parameters | ⚫⚫#11 |
 ### initializer
 The value after `=` in a declaration.
 
@@ -402,4 +402,4 @@ A function's signature together with its body.
 
 | rule                                                                                                                                                                      | example                                   | gotchas                                                                                                                                                                      | SUBSET.md says         | slice     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | --------- |
-| [declaration-specifiers](#declaration-specifiers) [declarator](#declarator) [declaration-list](#declaration-list)<sub>opt</sub> [compound-statement](#compound-statement) | `int add(int a, int b) { return a + b; }` | The declaration-list is K&R parameter declarations, which C~~ doesn't have. The declarator must be a function declarator: `int x { }` parses up to `{` and must be rejected. | ⚠️ no declaration-list | ⚫#1, 🟨#9 |
+| [declaration-specifiers](#declaration-specifiers) [declarator](#declarator) [declaration-list](#declaration-list)<sub>opt</sub> [compound-statement](#compound-statement) | `int add(int a, int b) { return a + b; }` | The declaration-list is K&R parameter declarations, which Cminor doesn't have. The declarator must be a function declarator: `int x { }` parses up to `{` and must be rejected. | ⚠️ no declaration-list | ⚫#1, 🟨#9 |

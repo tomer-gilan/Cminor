@@ -1,6 +1,6 @@
 # Testing
 
-How the C~~ test suite is structured, and why. The roadmap for building it is in `roadmaps/testing-roadmap.md`.
+How the Cminor test suite is structured, and why. The roadmap for building it is in `roadmaps/testing-roadmap.md`.
 End-to-end compiler tests (compile a `.c` file, run it, check the exit code) are also covered in `educational/followup-setup-testing-expectations.md`. This document focuses on unit tests and the overall setup.
 
 Decisions: ADR-002 (commit-time test check) and ADR-003 (golden-file tests) in `architecture-decisions.md`.

@@ -133,7 +133,7 @@ static void test_type_functions_equal_when_signatures_equal(void) {
 
     CHECK(type_are_equal(&function, &other_function));
 }
-/** int f(void) and int f() are the same type in C~~ (implementation-defined.md): no parameters at all. */
+/** int f(void) and int f() are the same type in Cminor (implementation-defined.md): no parameters at all. */
 static void test_type_functions_without_parameters_are_equal(void) {
     const Type function = function_of(&int_type, NULL, 0);
     const Type other_function = function_of(&int_type, NULL, 0);

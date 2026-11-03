@@ -43,7 +43,7 @@ Example: signed integer overflow (`INT_MAX + 1`), dereferencing a null pointer, 
 
 ## Preprocessing
 
-Not in C~~: there is no preprocessor.
+Not in Cminor: there is no preprocessor.
 
 ### Preprocessor `[preprocessor]` (`#define SQUARE(x) ((x)*(x))`)
 A text-substitution pass that runs *before* compilation proper: expands `#include`, `#define` macros, evaluates `#ifdef` conditionals. Produces a single expanded source file. Often skipped in a first compiler.

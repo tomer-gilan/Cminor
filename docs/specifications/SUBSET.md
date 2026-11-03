@@ -1,5 +1,5 @@
 
-The following is the formal definition of the C standard features that are supported by the C~~ compiler.
+The following is the formal definition of the C standard features that are supported by the Cminor compiler.
 Note that these features are categorized based on their respective definitions in the [C standard](https://www.iso-9899.info/n1570.html#A.).
 Implementation-defined choices (sizes, signedness, evaluation order, ...) are in [`implementation-defined.md`](implementation-defined.md).
 # A. \[Annex A (informative) Language syntax summary]
@@ -64,7 +64,7 @@ Rules:
   array operand doesn't decay (`int a[3]; sizeof a` is 12). The result's type is `int`, not `size_t` (see
   `implementation-defined.md`).
 * **No `--` or `++` spelled without a space.** Two `-` tokens (or two `+` tokens) whose ranges touch, as in `--x` or
-  `a--b`, are a syntax error: in C they'd be the decrement/increment operator, so accepting them would make a C~~
+  `a--b`, are a syntax error: in C they'd be the decrement/increment operator, so accepting them would make a Cminor
   program mean something different in C. `- -x` with a space is fine.
 * Pointer arithmetic: pointer ± int only. Pointer − pointer is not supported (see `implementation-defined.md`).
 * `void *` converts implicitly to and from any other object pointer type. It can't be dereferenced or used in arithmetic.

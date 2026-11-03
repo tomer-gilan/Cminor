@@ -528,7 +528,7 @@ static void test_lexer_x_newline(void) {
 }
 
 /**
- * Regression: a file that is just "+", i.e. a punctuator that could grow (++ isn't in C~~, but the lexer peeks
+ * Regression: a file that is just "+", i.e. a punctuator that could grow (++ isn't in Cminor, but the lexer peeks
  * past it) ending exactly at EOF.
  * @note Written by Claude on 10-Oct-26, not by Tomer.
  */
@@ -1519,7 +1519,7 @@ static void test_lexer_mixed_signs(void) {
     };
     check_tokens("-+-+", alternating, 5);
 }
-/** There's no compound assignment in C~~, so "+=" and "-=" are a sign then '='. */
+/** There's no compound assignment in Cminor, so "+=" and "-=" are a sign then '='. */
 static void test_lexer_sign_equals(void) {
     const ExpectedToken plus_equals[] = {{TOKEN_PLUS, 0, 1}, {TOKEN_EQUALS, 1, 1}, {TOKEN_EOF, 2, 0}};
     check_tokens("+=", plus_equals, 3);

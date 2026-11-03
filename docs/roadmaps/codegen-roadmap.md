@@ -1,6 +1,6 @@
 # Code Generation Roadmap
 
-The step-by-step plan for C~~'s code generation ("codegen"): the AST and sema's side table in, x86-64 assembly (AT&T
+The step-by-step plan for Cminor's code generation ("codegen"): the AST and sema's side table in, x86-64 assembly (AT&T
 syntax, ADR-005) out, as a `.s` file that `gcc` assembles and links against libc (ADR-001). Codegen reads the AST
 (ADR-023: it never changes it) and the types and symbols sema recorded, and decides everything the machine needs:
 instructions, registers, stack slots, labels, sections, and the System V calling convention.
@@ -66,7 +66,7 @@ handle is a compiler bug, caught by an `assert` (ADR-011).
 A step isn't done until its tests are in place and pass, both in the normal build and in the sanitizer build (where
 the compiler itself runs under ASan and UBSan).
 
-1. **End-to-end tests** (the main oracle). One small C~~ program per case in `tests/e2e/`: compile it to `.s`, assemble
+1. **End-to-end tests** (the main oracle). One small Cminor program per case in `tests/e2e/`: compile it to `.s`, assemble
    and link it with `gcc`, run it, and compare its exit status (and, from Step 9, its standard output) with the
    expectation in the program's `.exit` file. Expected values are written by hand from the standard and
    `implementation-defined.md`, never copied from the program's output.
@@ -99,7 +99,7 @@ non-zero exit status from the compiler.
 
 - [ ] For every slice, before its step: compile its example with
   `gcc -O0 -S -fno-asynchronous-unwind-tables -o - x.c` and read the output. (The flag drops the `.cfi_` directives,
-  which are only noise at this point.) It's AT&T syntax, like C~~'s.
+  which are only noise at this point.) It's AT&T syntax, like Cminor's.
 - [ ] Nora Sandler, *Writing a C Compiler* (No Starch, 2024): chapters 1–10 follow almost the same slices. It goes
   through an IR (TACKY); read it for the assembly, whatever Step 0c decides about an IR.
 - [ ] Abdulaziz Ghuloum, "An Incremental Approach to Compiler Construction" (2006, 11 pages): where this slice-by-slice
@@ -331,4 +331,4 @@ Each step lists what codegen emits, the end-to-end tests, and the gotchas.
 - [ ] Coverage run over codegen: every branch has run at least once.
 - [ ] A larger end-to-end program that uses every slice together (a sieve of primes, a string reversal, a recursive
   algorithm over an array).
-- [ ] Milestone tag (`codegen-v1`, and with it C~~ v1), with Tomer's approval.
+- [ ] Milestone tag (`codegen-v1`, and with it Cminor v1), with Tomer's approval.

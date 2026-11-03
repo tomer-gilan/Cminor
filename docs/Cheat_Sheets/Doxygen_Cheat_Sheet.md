@@ -259,7 +259,7 @@ Generate a config file once with `doxygen -g` (it creates a `Doxyfile`), then ch
 
 | Setting | Value | Why |
 |---|---|---|
-| `PROJECT_NAME` | `"C~~"` | the title on the pages |
+| `PROJECT_NAME` | `"Cminor"` | the title on the pages |
 | `INPUT` | `git_code` | which folder to scan |
 | `RECURSIVE` | `YES` | include subfolders |
 | `OPTIMIZE_OUTPUT_FOR_C` | `YES` | C wording (e.g. "struct" instead of "class") |

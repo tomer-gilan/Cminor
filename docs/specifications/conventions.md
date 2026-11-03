@@ -1,6 +1,6 @@
 # Coding Conventions
 
-How the C~~ compiler's own source is written. These rules were inferred from the existing code and confirmed on 2026-09-30. New code follows them; code that doesn't is either a bug or a reason to change this file first.
+How the Cminor compiler's own source is written. These rules were inferred from the existing code and confirmed on 2026-09-30. New code follows them; code that doesn't is either a bug or a reason to change this file first.
 
 ---
 
@@ -25,7 +25,7 @@ How the C~~ compiler's own source is written. These rules were inferred from the
 - Sizes, lengths, offsets and indices are **`int`**, not `size_t`. This is deliberate:
   - It avoids signed/unsigned comparison bugs.
   - `-1` works as the "not found" sentinel (`list_index_of`).
-  - It stays inside the C~~ subset (no `unsigned`, no `size_t`), keeping self-hosting possible (ADR-004).
+  - It stays inside the Cminor subset (no `unsigned`, no `size_t`), keeping self-hosting possible (ADR-004).
 
 ## Characters and bytes
 

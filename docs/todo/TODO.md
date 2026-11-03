@@ -61,7 +61,7 @@ scope from the 2026-10-13 quiz (A.2), except for the EBNF:
 - [x] Comments: both `/* */` and `//` are in (translation phase 3; each comment becomes one space).
 - [x] A.1.5/A.1.6 escape sequences: exactly the 11 simple escapes `\'` `\"` `\?` `\\` `\a` `\b` `\f` `\n` `\r` `\t` `\v`, plus `\0`. No other octal escapes, no hex escapes, no `\e`.
 - [x] Unary operators: all six prefix operators `- + ! ~ * &` are in.
-- [ ] Fill in the **A.2 Phrase structure grammar** EBNF (the scope is written; the grammar isn't): A.2.1 Expressions, A.2.2 Declarations, A.2.3 Statements, A.2.4 External definitions. Write each as a trimmed-down (E)BNF of what C~~ accepts (see `annex-a-breakdown.md`). This is the parser's spec, so it has to exist before the parser does.
+- [ ] Fill in the **A.2 Phrase structure grammar** EBNF (the scope is written; the grammar isn't): A.2.1 Expressions, A.2.2 Declarations, A.2.3 Statements, A.2.4 External definitions. Write each as a trimmed-down (E)BNF of what Cminor accepts (see `annex-a-breakdown.md`). This is the parser's spec, so it has to exist before the parser does.
 - [x] Record pointer − pointer as unsupported (only pointer ± int; see `implementation-defined.md`).
 
 ## Parser
@@ -90,7 +90,7 @@ structure), and `roadmaps/` (the testing and parser roadmaps).
 Not planned; recorded so the trade-offs don't have to be re-derived.
 
 - [ ] **Migrate the compiler's own source from C11 to C23** (`CMAKE_C_STANDARD 23`). The main gain: `f()` becomes a
-  real prototype (it means `(void)`, as in C~~), so empty parameter lists get argument checking. Checked on
+  real prototype (it means `(void)`, as in Cminor), so empty parameter lists get argument checking. Checked on
   2026-10-16: every `.c` file compiles as `gnu23` with GCC 15.2 with no errors. The costs:
   - it supersedes ADR-004, so it needs a new ADR;
   - the toolchain floor rises to GCC 13+ / Clang 16+;
