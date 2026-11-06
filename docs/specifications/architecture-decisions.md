@@ -324,9 +324,13 @@ compound statement goes from `{` to `}`, and a function definition from `int` to
 from its left operand's start to its right operand's end. A node's range is built with `range_union` over its tokens
 and children.
 
+Parentheses produce no node, so the inner node's range is widened to include them (Tomer, 2026-11-06): `(1 + 2)` spans
+from `(` to `)`, `-(2)` reaches the `)`, and `(1 + 2) * 3` starts at the `(`. Each level of `((2))` widens it again.
+
 ### Consequences
 - A diagnostic about a node can underline exactly the code the user wrote.
 - Parse functions have to keep the tokens they consume (`(`, `;`, `}`), not only the children, to compute the range.
+- A node doesn't remember its range without parentheses, so no diagnostic can point at just the `1 + 2` of `(1 + 2)`.
 - Tests that check ranges by hand-counted offsets are fragile. Keep them in a few dedicated tests once the AST dump
   exists (parser roadmap Step 2).
 

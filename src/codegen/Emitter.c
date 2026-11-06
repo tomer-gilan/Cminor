@@ -344,7 +344,6 @@ Text* emitter_detach_text(Emitter* const this) {
     return printer_detach_text(this->printer);
 }
 
-
 void emitter_emit_external_linkage(Emitter* const this, const Label label) {
     assert(this != NULL);
 
@@ -490,4 +489,3 @@ void emitter_emit_sete(Emitter* const this, const Operand only) {
     // e.g.: "-8(%rbp), %al"
     emitter_emit_operand(this, only);
 }
-

@@ -10,20 +10,38 @@ typedef struct Parser Parser;
 
 typedef struct ExpressionNode ExpressionNode;
 
-// IMPORTANT - when adding new entries, do not forget adding matching lookup value in Parser::parser_token_to_expression_kind
+// IMPORTANT - when adding new entries, do not forget adding matching lookup value in Parser::token_kind_to_binary_expression_kind
+typedef enum {
+    BINARY_EXPRESSION_KIND_ADD,         // +
+    BINARY_EXPRESSION_KIND_SUBTRACT,    // -
+    BINARY_EXPRESSION_KIND_MULTIPLY,    // *
+    BINARY_EXPRESSION_KIND_DIVIDE,      // /
+    BINARY_EXPRESSION_KIND_MODULO,      // %
+
+    BINARY_EXPRESSION_KIND_NONE,
+    BINARY_EXPRESSION_KIND__COUNT,
+} ExpressionBinaryKind;
+typedef struct {
+    ExpressionBinaryKind kind;
+    const ExpressionNode* left;
+    const ExpressionNode* right;
+} ExpressionBinary;
+
+// IMPORTANT - when adding new entries, do not forget adding matching lookup value in Parser::token_kind_to_unary_expression_kind
 typedef enum {
     UNARY_EXPRESSION_KIND_BINARY_NEGATE,    // ~
     UNARY_EXPRESSION_KIND_LOGICAL_NOT,      // !
     UNARY_EXPRESSION_KIND_NUMERIC_PLUS,     // +
     UNARY_EXPRESSION_KIND_NUMERIC_MINUS,    // -
-    UNARY_EXPRESSION_KIND_NONE,
 
+    UNARY_EXPRESSION_KIND_NONE,
     UNARY_EXPRESSION_KIND__COUNT,
-} UnaryExpressionKind;
+} ExpressionUnaryKind;
 typedef struct {
-    UnaryExpressionKind kind;
+    ExpressionUnaryKind kind;
     const ExpressionNode* operand;
 } ExpressionUnary;
+
 typedef struct {
     int value;
 } ExpressionIntConstant;
@@ -31,6 +49,7 @@ typedef struct {
 typedef enum {
     EXPRESSION_KIND_INT_CONSTANT,
     EXPRESSION_KIND_UNARY,
+    EXPRESSION_KIND_BINARY,
 
     EXPRESSION_KIND__COUNT
 } ExpressionKind;
@@ -41,6 +60,7 @@ struct ExpressionNode {
     union {
         ExpressionIntConstant int_constant;
         ExpressionUnary unary;
+        ExpressionBinary binary;
     } as;
 } ;
 
