@@ -5,6 +5,7 @@
 #include "Codegen.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdlib.h>
 
 #include "Context.h"
@@ -29,50 +30,66 @@ void codegen_destroy(Codegen* const this) {
     free(this);
 }
 
-// Code Generation:
+// helpers:
 
 static Width codegen_width_by_type(const Type* type) {
     switch (type->kind) {
         case TYPE_KIND_INT:
             return WIDTH_LONG;
-            break;
         case TYPE_KIND_CHAR:
             return WIDTH_BYTE;
-            break;
         // I might be wrong but these types do not have a width:
         case TYPE_KIND_FUNCTION:
         case TYPE_KIND_POINTER:
         case TYPE_KIND_ARRAY:
         case TYPE_KIND_VOID:
+        case TYPE_KIND__COUNT:
+        case TYPE_KIND_NONE:
         default:
             assert(false && "invalid program state");
+            return -1; // fictive, should never reach this point
     }
 }
+static Width codegen_width_by_expression_node(
+    const Codegen* const this,
+    const ExpressionNode* const expression_node) {
+    assert(this != NULL);
+    assert(expression_node != NULL);
+
+    const int expression_id = expression_node->id;
+    assert(0 <= expression_id && expression_id < this->sema_result.expressions_count);
+
+    return codegen_width_by_type(this->sema_result.expressions_semantics[expression_id].type);
+}
+
+// Code Generation:
+
 static void codegen_generate_statement(Codegen* this, const StatementNode* statement_node);
 
 /**
  * generates code that leads the expression to be saved in %rax.
  */
-static Width codegen_generate_expression(               Codegen* const this, const ExpressionNode*          const expression_node) {
+static void codegen_generate_expression(               Codegen* const this, const ExpressionNode*          const expression_node) {
     assert(this != NULL);
     assert(expression_node != NULL);
 
+    const Width width = codegen_width_by_expression_node(this, expression_node);
+
     switch (expression_node->kind) {
-        case EXPRESSION_KIND_INT_CONSTANT: {
-            const Width width = WIDTH_LONG;
+        case EXPRESSION_KIND_INT_CONSTANT:
             emitter_emit_mov(
-                this->emitter,
-                width,
-                operand_make_immediate(expression_node->as.int_constant.value),
-                operand_make_register(register_make(REGISTER_KIND_RAX, width)));
-            return width;
-        }
+                    this->emitter,
+                    width,
+                    operand_make_immediate(expression_node->as.int_constant.value),
+                    operand_make_register(register_make(REGISTER_KIND_RAX, width)));
+            break;
         case EXPRESSION_KIND_UNARY: {
-            const Width width = codegen_generate_expression(this, expression_node->as.unary.operand);
-            const Operand rax_operand = operand_make_register(register_make(REGISTER_KIND_RAX, width));
+            // TODO: delegate this to a helper that gets the operand.
+            codegen_generate_expression(this, expression_node->as.unary.operand);
+            const Operand rax = operand_make_register(register_make(REGISTER_KIND_RAX, width));
             switch (expression_node->as.unary.kind) {
                 case UNARY_EXPRESSION_KIND_BINARY_NEGATE:
-                    emitter_emit_not(this->emitter, width, rax_operand);
+                    emitter_emit_not(this->emitter, width, rax);
                     break;
                 case UNARY_EXPRESSION_KIND_LOGICAL_NOT:
                     // change flags to remember if %rax was 0:
@@ -80,32 +97,72 @@ static Width codegen_generate_expression(               Codegen* const this, con
                         this->emitter,
                         width,
                         operand_make_immediate(0),
-                        rax_operand);
+                        rax);
                     // zeros %rax (because 32 bit operations zero out all 64 bits):
                     emitter_emit_mov(
                         this->emitter,
                         WIDTH_LONG,
                         operand_make_immediate(0),
-                        rax_operand);
+                        rax);
                     // stores equality check in %al (which de-facto is also %rax):
-                    emitter_emit_sete(this->emitter, operand_make_register(register_make(rax_operand.as.register_.kind, WIDTH_BYTE)));
+                    emitter_emit_sete(this->emitter, operand_make_register(register_make(rax.as.register_.kind, WIDTH_BYTE)));
                     break;
                 case UNARY_EXPRESSION_KIND_NUMERIC_PLUS:
                     break; // no-op by design
                 case UNARY_EXPRESSION_KIND_NUMERIC_MINUS:
-                    emitter_emit_neg(this->emitter, width, rax_operand);
+                    emitter_emit_neg(this->emitter, width, rax);
                     break;
                 case UNARY_EXPRESSION_KIND_NONE:
                 case UNARY_EXPRESSION_KIND__COUNT:
                     assert(false && "invalid program state");
                     break;
             }
-            return width;
+            break;
+        }
+        case EXPRESSION_KIND_BINARY: {
+            // TODO: delegate this to a helper that takes both side's type
+
+            codegen_generate_expression(this, expression_node->as.binary.left);    // result is saved in ax.
+            const Operand rax = operand_make_register(register_make(REGISTER_KIND_RAX, codegen_width_by_expression_node(this, expression_node->as.binary.right)));
+            emitter_emit_push(this->emitter, rax);                                  // backs it up
+
+            codegen_generate_expression(this, expression_node->as.binary.right);     // result is saved in ax.
+            // Note - we choose cx because its caller saved.
+            const Operand rcx = operand_make_register(register_make(REGISTER_KIND_RCX, codegen_width_by_expression_node(this, expression_node->as.binary.left)));
+            emitter_emit_mov(this->emitter, rax.as.register_.width, rax, rcx);
+            emitter_emit_pop(this->emitter, rax);                                   // restores into cx.
+
+            switch (expression_node->as.binary.kind) {
+                case BINARY_EXPRESSION_KIND_ADD:
+                    emitter_emit_add(this->emitter, width, rcx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_SUBTRACT:
+                    emitter_emit_sub(this->emitter, width, rcx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_MULTIPLY:
+                    emitter_emit_imul(this->emitter, width, rcx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_DIVIDE:
+                    emitter_emit_cltd(this->emitter);
+                    emitter_emit_idiv(this->emitter, rcx);
+                    break;
+                case BINARY_EXPRESSION_KIND_MODULO:
+                    emitter_emit_cltd(this->emitter);
+                    emitter_emit_idiv(this->emitter, rcx);
+                    const Operand rdx = operand_make_register(register_make(REGISTER_KIND_RDX, WIDTH_LONG));
+                    emitter_emit_mov(this->emitter, width, rdx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_NONE:
+                case BINARY_EXPRESSION_KIND__COUNT:
+                    assert(false && "invalid program state");
+                    break;
+            }
+            break;
         }
         case EXPRESSION_KIND__COUNT:
         default:
             assert(false && "invalid program state");
-            return WIDTH_BYTE; // trash return value
+            break;
     }
 }
 static void codegen_generate_compound_statement(        Codegen* const this, const CompoundStatement*       const compound_statement) {

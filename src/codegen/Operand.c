@@ -83,12 +83,7 @@ Register register_make(const RegisterKind kind, const Width width) {
 
 EffectiveAddress effective_address_make_sib(const Width scale, const Register index, const Register base, const Displacement displacement) {
     assert(index.kind != REGISTER_KIND_RSP && index.kind != REGISTER_KIND_RIP);
-    assert(index.kind == REGISTER_KIND_NONE || index.width == WIDTH_QUAD);
-
-    assert(base.kind != REGISTER_KIND_RIP);
-    assert(base.kind == REGISTER_KIND_NONE || base.width == WIDTH_QUAD);
-
-    assert(base.kind != REGISTER_KIND_NONE); // such that only disp(%base, %index, scale) and disp(%base) forms are allowed.
+    assert(base.kind != REGISTER_KIND_RIP && base.kind != REGISTER_KIND_NONE); // such that only disp(%base, %index, scale) and disp(%base) forms are allowed.
 
     return (EffectiveAddress){
         .kind = EFFECTIVE_ADDRESS_KIND_SIB,

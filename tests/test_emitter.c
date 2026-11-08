@@ -419,14 +419,14 @@ static void test_emitter_cmp_immediate_with_memory(void) {
 
     CHECK(emitter_output_is(emitter, "\ncmpl $0, -4(%rbp)\ncmpb $7, -1(%rbp)\n"));
 }
-/** sete writes one byte, so it takes no suffix: a byte register, or a byte in memory. */
+/** sete writes one byte, so its suffix is always b: a byte register, or a byte in memory. */
 static void test_emitter_sete(void) {
     Emitter* const emitter = emitter_create();
     emitter_emit_sete(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_BYTE));
     emitter_emit_sete(emitter, register_operand(REGISTER_KIND_RSI, WIDTH_BYTE));
     emitter_emit_sete(emitter, base_operand(REGISTER_KIND_RBP, -1));
 
-    CHECK(emitter_output_is(emitter, "\nsete %al\nsete %sil\nsete -1(%rbp)\n"));
+    CHECK(emitter_output_is(emitter, "\nseteb %al\nseteb %sil\nseteb -1(%rbp)\n"));
 }
 /**
  * The slice 2 shape of !x with x in %eax: compare with 0, zero %eax with a mov (an xor would clobber the flags cmp
@@ -438,7 +438,120 @@ static void test_emitter_logical_not_sequence(void) {
     emitter_emit_mov(emitter, WIDTH_LONG, operand_make_immediate(0), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
     emitter_emit_sete(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_BYTE));
 
-    CHECK(emitter_output_is(emitter, "\ncmpl $0, %eax\nmovl $0, %eax\nsete %al\n"));
+    CHECK(emitter_output_is(emitter, "\ncmpl $0, %eax\nmovl $0, %eax\nseteb %al\n"));
+}
+
+// -------- Binary arithmetic: add, sub, imul -------- //
+
+/**
+ * AT&T order: "op source, destination" computes destination op source into destination. So "subl %ecx, %eax" is
+ * %eax - %ecx, the order 10 - 3 needs with 10 in %eax.
+ */
+static void test_emitter_add_and_sub_registers(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_add(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sub(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_add(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_sub(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+
+    CHECK(emitter_output_is(emitter, "\naddl %ecx, %eax\nsubl %ecx, %eax\naddq %rcx, %rax\nsubq %rcx, %rax\n"));
+}
+/** The operand combinations add and sub share with mov: an immediate or memory source, or a memory destination. */
+static void test_emitter_add_and_sub_immediate_and_memory(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_add(emitter, WIDTH_LONG, operand_make_immediate(5), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sub(emitter, WIDTH_LONG, base_operand(REGISTER_KIND_RBP, -4),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_add(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RAX, WIDTH_LONG),
+                     base_operand(REGISTER_KIND_RBP, -4));
+    emitter_emit_sub(emitter, WIDTH_QUAD, operand_make_immediate(16), base_operand(REGISTER_KIND_RBP, -16));
+
+    CHECK(emitter_output_is(emitter,
+                            "\naddl $5, %eax\nsubl -4(%rbp), %eax\naddl %eax, -4(%rbp)\nsubq $16, -16(%rbp)\n"));
+}
+/** Two-operand imul: the destination is always a register, and the source a register or memory. */
+static void test_emitter_imul(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_imul(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                      register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_imul(emitter, WIDTH_LONG, base_operand(REGISTER_KIND_RBP, -4),
+                      register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_imul(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                      register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+
+    CHECK(emitter_output_is(emitter, "\nimull %ecx, %eax\nimull -4(%rbp), %eax\nimulq %rcx, %rax\n"));
+}
+
+// -------- Division: cltd, idiv -------- //
+
+/** cltd has no operands: %eax and %edx are implicit. Nothing follows the mnemonic, not even a space. */
+static void test_emitter_cltd(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_cltd(emitter);
+
+    CHECK(emitter_output_is(emitter, "\ncltd\n"));
+}
+/** idiv names only the divisor: the dividend (%edx:%eax) and both results (%eax, %edx) are implicit. */
+static void test_emitter_idiv(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_idiv(emitter, register_operand(REGISTER_KIND_RCX, WIDTH_LONG));
+    emitter_emit_idiv(emitter, register_operand(REGISTER_KIND_RSI, WIDTH_LONG));
+
+    CHECK(emitter_output_is(emitter, "\nidivl %ecx\nidivl %esi\n"));
+}
+/** The slice 3 shape of a % b with a in %eax and b in %ecx: sign-extend, divide, then take the remainder from %edx. */
+static void test_emitter_modulo_sequence(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_cltd(emitter);
+    emitter_emit_idiv(emitter, register_operand(REGISTER_KIND_RCX, WIDTH_LONG));
+    emitter_emit_mov(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RDX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+
+    CHECK(emitter_output_is(emitter, "\ncltd\nidivl %ecx\nmovl %edx, %eax\n"));
+}
+
+// -------- Stack: push, pop -------- //
+
+/** In 64-bit mode push and pop always move 8 bytes, so the suffix is always q (pushl doesn't exist). */
+static void test_emitter_push_and_pop_registers(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_push(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_pop(emitter, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD));
+    emitter_emit_push(emitter, register_operand(REGISTER_KIND_R12, WIDTH_QUAD));
+    emitter_emit_pop(emitter, register_operand(REGISTER_KIND_R12, WIDTH_QUAD));
+
+    CHECK(emitter_output_is(emitter, "\npushq %rax\npopq %rcx\npushq %r12\npopq %r12\n"));
+}
+/** push also takes memory and an immediate; pop takes memory (it can't write to an immediate). */
+static void test_emitter_push_and_pop_memory_and_immediate(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_push(emitter, base_operand(REGISTER_KIND_RBP, -8));
+    emitter_emit_push(emitter, operand_make_immediate(5));
+    emitter_emit_pop(emitter, base_operand(REGISTER_KIND_RBP, -16));
+
+    CHECK(emitter_output_is(emitter, "\npushq -8(%rbp)\npushq $5\npopq -16(%rbp)\n"));
+}
+/**
+ * The slice 3 stack machine on 10 - 3: the left value waits on the stack while the right one is computed, then the
+ * right one moves to %ecx and the left one comes back into %eax.
+ */
+static void test_emitter_stack_machine_sequence(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_mov(emitter, WIDTH_LONG, operand_make_immediate(10), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_push(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_mov(emitter, WIDTH_LONG, operand_make_immediate(3), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_mov(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RAX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RCX, WIDTH_LONG));
+    emitter_emit_pop(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_sub(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+
+    CHECK(emitter_output_is(emitter, "\nmovl $10, %eax\npushq %rax\nmovl $3, %eax\n"
+                                     "movl %eax, %ecx\npopq %rax\nsubl %ecx, %eax\n"));
 }
 
 // -------- Ownership -------- //
@@ -500,6 +613,18 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_emitter_cmp_immediate_with_memory);
     RUN_TEST(test_emitter_sete);
     RUN_TEST(test_emitter_logical_not_sequence);
+
+    RUN_TEST(test_emitter_add_and_sub_registers);
+    RUN_TEST(test_emitter_add_and_sub_immediate_and_memory);
+    RUN_TEST(test_emitter_imul);
+
+    RUN_TEST(test_emitter_cltd);
+    RUN_TEST(test_emitter_idiv);
+    RUN_TEST(test_emitter_modulo_sequence);
+
+    RUN_TEST(test_emitter_push_and_pop_registers);
+    RUN_TEST(test_emitter_push_and_pop_memory_and_immediate);
+    RUN_TEST(test_emitter_stack_machine_sequence);
 
     RUN_TEST(test_emitter_destroy_without_detach);
     RUN_TEST(test_emitter_detached_text_outlives_emitter);

@@ -370,6 +370,7 @@ void emitter_emit_label(Emitter* const this, const Label label) {
 
     text_destroy(spelling);
 }
+
 /**
  * @note: look at the source code. The builtin Doxygen screws the table formats.
  *
@@ -384,7 +385,7 @@ void emitter_emit_label(Emitter* const this, const Label label) {
  *
  *  M: memory operand; R: register operand; I: immediate operand.
  *  X: invalid combination
- *  *: provided withs must match the registers ones.
+ *  *: provided With-s must match the registers'.
  *  **: uses the provided width as-is.
  *
  *  the various asserts will have numbers next to them. That corresponds to the operand-combination-options:
@@ -396,31 +397,59 @@ void emitter_emit_label(Emitter* const this, const Label label) {
  * ---+---+---+---
  *  I | 7 | 8 | 9
  */
-void emitter_emit_mov(Emitter* const this, const Width width, const Operand source, const Operand destination) {
-    assert(this != NULL);
-
+static void assert_operands_validness(Width width, const Operand source, const Operand destination) {
     assert(destination.kind != OPERAND_KIND_IMMEDIATE);                                             // #3, #6, #9
     assert(!(source.kind == OPERAND_KIND_MEMORY && destination.kind == OPERAND_KIND_MEMORY));       // #1
     assert(source.kind      != OPERAND_KIND_REGISTER || source.as.register_.width       == width);  // #4, #5
     assert(destination.kind != OPERAND_KIND_REGISTER || destination.as.register_.width  == width);  // #2, #5, #8
+}
+static void emitter_emit_zero_operand_instruction(Emitter* const this, const TextView instruction) {
+    assert(this != NULL);
 
     printer_print_new_line(this->printer);
 
-    // e.g.: "movq "
-    printer_print_text_view(this->printer, text_view_value_of_literal("mov"));
+    printer_print_text_view(this->printer, instruction);
+}
+static void emitter_emit_one_operand_instruction(Emitter* const this, const TextView instruction, const Width width, const Operand only) {
+    assert(this != NULL);
+
+    printer_print_new_line(this->printer);
+
+    printer_print_text_view(this->printer, instruction);
     emitter_emit_instruction_suffix(this, width);
     printer_print_char(this->printer, ' ');
 
-    // e.g.: "$5, %rax"
+    emitter_emit_operand(this, only);
+}
+static void emitter_emit_two_operand_instruction(Emitter* const this, const TextView instruction, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+
+    printer_print_new_line(this->printer);
+
+    printer_print_text_view(this->printer, instruction);
+    emitter_emit_instruction_suffix(this, width);
+    printer_print_char(this->printer, ' ');
+
     emitter_emit_operand(this, source);
     emitter_emit_separation(this);
     emitter_emit_operand(this, destination);
 }
+
+void emitter_emit_mov(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("mov"),
+        width,
+        source,
+        destination);
+}
 void emitter_emit_ret(Emitter* const this) {
     assert(this != NULL);
 
-    printer_print_new_line(this->printer);
-    printer_print_text_view(this->printer, text_view_value_of_literal("ret"));
+    emitter_emit_zero_operand_instruction(this, text_view_value_of_literal("ret"));
 }
 void emitter_emit_neg(Emitter* const this, const Width width, const Operand only) {
     assert(this != NULL);
@@ -428,15 +457,11 @@ void emitter_emit_neg(Emitter* const this, const Width width, const Operand only
     assert( (only.kind == OPERAND_KIND_MEMORY) ||
             (only.kind == OPERAND_KIND_REGISTER && only.as.register_.width == width));
 
-    printer_print_new_line(this->printer);
-
-    // e.g.: "negq "
-    printer_print_text_view(this->printer, text_view_value_of_literal("neg"));
-    emitter_emit_instruction_suffix(this, width);
-    printer_print_char(this->printer, ' ');
-
-    // e.g.: "-8(%rbp), %rax"
-    emitter_emit_operand(this, only);
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("neg"),
+        width,
+        only);
 }
 void emitter_emit_not(Emitter* const this, const Width width, const Operand only) {
     assert(this != NULL);
@@ -444,48 +469,165 @@ void emitter_emit_not(Emitter* const this, const Width width, const Operand only
     assert( (only.kind == OPERAND_KIND_MEMORY) ||
             (only.kind == OPERAND_KIND_REGISTER && only.as.register_.width == width));
 
-    printer_print_new_line(this->printer);
-
-    // e.g.: "notq "
-    printer_print_text_view(this->printer, text_view_value_of_literal("not"));
-    emitter_emit_instruction_suffix(this, width);
-    printer_print_char(this->printer, ' ');
-
-    // e.g.: "-8(%rbp), %rax"
-    emitter_emit_operand(this, only);
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("not"),
+        width,
+        only);
 }
 void emitter_emit_cmp(Emitter* const this, const Width width, const Operand source, const Operand destination) {
     assert(this != NULL);
+    assert_operands_validness(width, source, destination);
 
-    assert(destination.kind != OPERAND_KIND_IMMEDIATE);
-    if (source.kind == OPERAND_KIND_REGISTER)
-        assert(source.as.register_.width == width);
-    if (destination.kind == OPERAND_KIND_REGISTER)
-        assert(destination.as.register_.width == width);
-
-    printer_print_new_line(this->printer);
-
-    // e.g.: "cmpq "
-    printer_print_text_view(this->printer, text_view_value_of_literal("cmp"));
-    emitter_emit_instruction_suffix(this, width);
-    printer_print_char(this->printer, ' ');
-
-    // e.g.: "-8(%rbp), %rax"
-    emitter_emit_operand(this, source);
-    emitter_emit_separation(this);
-    emitter_emit_operand(this, destination);
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("cmp"),
+        width,
+        source,
+        destination);
 }
 void emitter_emit_sete(Emitter* const this, const Operand only) {
     assert(this != NULL);
 
-    assert((only.kind == OPERAND_KIND_REGISTER && only.as.register_.width == WIDTH_BYTE) ||
+    const Width width = WIDTH_BYTE;
+    assert((only.kind == OPERAND_KIND_REGISTER && only.as.register_.width == width) ||
         only.kind == OPERAND_KIND_MEMORY);
 
-    printer_print_new_line(this->printer);
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("sete"),
+        width,
+        only);
+}
 
-    printer_print_text_view(this->printer, text_view_value_of_literal("sete"));
-    printer_print_char(this->printer, ' ');
+/**
+ * @note: look at the source code. The builtin Doxygen screws the table formats.
+ *
+ * A quick reference to the different operands combinations:
+ * s\d| M | R | I
+ * ---+---+---+---
+ *  M | X | * | X
+ * ---+---+---+---
+ *  R | * | * | X
+ * ---+---+---+---
+ *  I | **| * | X
+ *
+ *  M: memory operand; R: register operand; I: immediate operand.
+ *  X: invalid combination
+ *  *: provided With-s must match the registers'.
+ *  **: uses the provided width as-is.
+ *
+ *  the various asserts will have numbers next to them. That corresponds to the operand-combination-options:
+ * s\d| M | R | I
+ * ---+---+---+---
+ *  M | 1 | 2 | 3
+ * ---+---+---+---
+ *  R | 4 | 5 | 6
+ * ---+---+---+---
+ *  I | 7 | 8 | 9
+ */
+void emitter_emit_add(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
 
-    // e.g.: "-8(%rbp), %al"
-    emitter_emit_operand(this, only);
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("add"),
+        width,
+        source,
+        destination);
+}
+void emitter_emit_sub(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("sub"),
+        width,
+        source,
+        destination);
+}
+/**
+ * imul takes a source which must be a register, and a destination which cannot be immediate.
+ * It then performs in-place multiplication.
+ */
+void emitter_emit_imul(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+
+    assert(destination.kind == OPERAND_KIND_REGISTER && destination.as.register_.width == width);
+    assert(source.kind != OPERAND_KIND_IMMEDIATE);
+    if (source.kind == OPERAND_KIND_REGISTER)
+        assert(source.as.register_.width == width);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("imul"),
+        width,
+        source,
+        destination);
+}
+/**
+ * sign extends %eax -> %edx:%eax
+ */
+void emitter_emit_cltd(Emitter* const this) {
+    assert(this != NULL);
+
+    emitter_emit_zero_operand_instruction(this, text_view_value_of_literal("cltd"));
+}
+/**
+ * unlike @c add and @c sub, @c idiv already expects:
+ * 0. @c divisor to be a register operand of WIDTH_LONG @c Width.
+ * 1. the @b divided @b value to be in @b %eax
+ * 2. the @b remainder is overwritten to @b %edx.
+ *
+ * It then computes (in python syntax):
+ *
+ * (@b %eax, @b %edx) @b = @b divmod( @b %eax, @b divisor).
+ *
+ * This is a result of x86_64 architecture design choices.
+ */
+void emitter_emit_idiv(Emitter* const this, const Operand divisor) {
+    assert(this != NULL);
+
+    const Width width = WIDTH_LONG;
+    assert(divisor.kind == OPERAND_KIND_REGISTER && divisor.as.register_.width == width);
+
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("idiv"),
+        width,
+        divisor);
+}
+
+/**
+ * @attention the operand's possible @c Width is ignored.
+ */
+void emitter_emit_push(Emitter* const this, Operand source) {
+    assert(this != NULL);
+
+    const Width width = WIDTH_QUAD;
+    if (source.kind == OPERAND_KIND_REGISTER)
+        source = operand_make_register(register_make(source.as.register_.kind, width));
+
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("push"),
+        width,
+        source);
+}
+void emitter_emit_pop(Emitter* const this, Operand destination) {
+    assert(this != NULL);
+
+    assert(destination.kind != OPERAND_KIND_IMMEDIATE);
+
+    const Width width = WIDTH_QUAD;
+    if (destination.kind == OPERAND_KIND_REGISTER)
+        destination = operand_make_register(register_make(destination.as.register_.kind, width));
+
+    emitter_emit_one_operand_instruction(
+        this,
+        text_view_value_of_literal("pop"),
+        width,
+        destination);
 }

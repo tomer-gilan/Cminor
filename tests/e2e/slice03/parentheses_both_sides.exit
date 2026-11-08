@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of parentheses_both_sides.c (see tests/run_e2e.sh).
+# 3 * 7. The right side runs while the left value waits on the stack.
+21

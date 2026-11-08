@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of modulo_negative_dividend.c (see tests/run_e2e.sh).
+# -1 mod 256: the remainder takes the sign of the dividend.
+255

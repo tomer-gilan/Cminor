@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of subtract_left_associative.c (see tests/run_e2e.sh).
+# (10 - 3) - 2. Swapped subl operands or a right-associative parse give a different value.
+5
