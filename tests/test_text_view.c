@@ -58,7 +58,7 @@ static void test_text_view_equals(void) {
         CHECK(!text_view_equals(sv1, sv3));
     }
 
-    _Static_assert(sizeof(sv_literal) == sizeof(sv_reg));
+    _Static_assert(sizeof(sv_literal) == sizeof(sv_reg), "sv_literal and sv_reg must hold the same number of views");
     const int N = sizeof(sv_literal) / sizeof(TextView);
     for (int i = 0; i < N; ++i)
         for (int j = 0; j < N; ++j)
