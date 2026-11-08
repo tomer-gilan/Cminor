@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of shift_right_sign_fills.c (see tests/run_e2e.sh).
+# -1 mod 256: the sign bit fills in from the left. shrl (logical) gives 1, and skipping the shift leaves -2 (254).
+255

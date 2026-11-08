@@ -12,11 +12,18 @@ typedef struct ExpressionNode ExpressionNode;
 
 // IMPORTANT - when adding new entries, do not forget adding matching lookup value in Parser::token_kind_to_binary_expression_kind
 typedef enum {
-    BINARY_EXPRESSION_KIND_ADD,         // +
-    BINARY_EXPRESSION_KIND_SUBTRACT,    // -
-    BINARY_EXPRESSION_KIND_MULTIPLY,    // *
-    BINARY_EXPRESSION_KIND_DIVIDE,      // /
-    BINARY_EXPRESSION_KIND_MODULO,      // %
+    // Arithmetic:
+    BINARY_EXPRESSION_KIND_ADD,                     // +
+    BINARY_EXPRESSION_KIND_SUBTRACT,                // -
+    BINARY_EXPRESSION_KIND_MULTIPLY,                // *
+    BINARY_EXPRESSION_KIND_DIVIDE,                  // /
+    BINARY_EXPRESSION_KIND_MODULO,                  // %
+    // Bitwise & Shift:
+    BINARY_EXPRESSION_KIND_BINARY_SHIFT_LEFT,       // <<
+    BINARY_EXPRESSION_KIND_BINARY_SHIFT_RIGHT,      // >>
+    BINARY_EXPRESSION_KIND_BITWISE_INCLUSIVE_OR,    // |
+    BINARY_EXPRESSION_KIND_BITWISE_EXCLUSIVE_OR,    // ^
+    BINARY_EXPRESSION_KIND_BITWISE_AND,             // &
 
     BINARY_EXPRESSION_KIND_NONE,
     BINARY_EXPRESSION_KIND__COUNT,

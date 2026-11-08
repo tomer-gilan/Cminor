@@ -1,8 +1,8 @@
 //
 // Written by Claude on 16-Oct-26. Moved to parser_parse on 28-Oct-26. AST dump checks added on 31-Oct-26.
 //
-// Parser tests for slices 1 and 2: expressions, statements, function definitions, the translation unit, whole programs,
-// and inputs that must be rejected. Slice 2's are written ahead, and fail until the parser handles slice 2. parser_parse is the parser's only parse function outside Parser.c, so every test parses
+// Parser tests for slices 1 to 4: expressions, statements, function definitions, the translation unit, whole programs,
+// and inputs that must be rejected. parser_parse is the parser's only parse function outside Parser.c, so every test parses
 // a whole program: expressions and statements are tested inside main's body ("int main(void) { ... }"), and their
 // offsets count from the start of that program. Each valid-input test checks the nodes and that no diagnostic was
 // reported. Each error test checks that parser_parse returns NULL and reports exactly one diagnostic, with the expected
@@ -943,6 +943,155 @@ static void test_parser_slice_3_error_minus_minus_and_plus_plus(void) {
     check_parse_fails("int main(void) { return 1 - --2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
 }
 
+// ---------------- Slice 4: bitwise and shift ---------------- //
+// Written by Claude on 08-Nov-26. Precedence, tightest first (C11 §6.5.5-6.5.12): "* / %", "+ -", "<< >>", "&", "^",
+// "|". All of them group to the left.
+
+/** "1 << 2", "1 >> 2", "1 & 2", "1 ^ 2", "1 | 2": each binary operator of slice 4 is a node with two operands. */
+static void test_parser_slice_4_each_binary_operator(void) {
+    check_returned_expression_dump("1 << 2", "(<< 1 2)");
+    check_returned_expression_dump("1 >> 2", "(>> 1 2)");
+    check_returned_expression_dump("1 & 2", "(& 1 2)");
+    check_returned_expression_dump("1 ^ 2", "(^ 1 2)");
+    check_returned_expression_dump("1 | 2", "(| 1 2)");
+}
+/** "1<<2+1", "8>>1", "1&2|3": no whitespace needed around the new operators. */
+static void test_parser_slice_4_no_whitespace(void) {
+    check_returned_expression_dump("1<<2+1", "(<< 1 (+ 2 1))");
+    check_returned_expression_dump("8>>1", "(>> 8 1)");
+    check_returned_expression_dump("1&2|3", "(| (& 1 2) 3)");
+}
+/** Shifts bind looser than "+ -" and "* / %", whichever comes first: "1 << 2 + 1" is 1 << 3, not (1 << 2) + 1. */
+static void test_parser_slice_4_shift_looser_than_arithmetic(void) {
+    check_returned_expression_dump("1 << 2 + 1", "(<< 1 (+ 2 1))");
+    check_returned_expression_dump("1 + 2 << 3", "(<< (+ 1 2) 3)");
+    check_returned_expression_dump("16 >> 1 * 2", "(>> 16 (* 1 2))");
+    check_returned_expression_dump("2 * 3 >> 1", "(>> (* 2 3) 1)");
+    check_returned_expression_dump("1 - 1 << 2 - 1", "(<< (- 1 1) (- 2 1))");
+}
+/** "&" binds tighter than "^", which binds tighter than "|", whichever comes first. */
+static void test_parser_slice_4_bitwise_precedence(void) {
+    check_returned_expression_dump("1 | 2 ^ 3 & 4", "(| 1 (^ 2 (& 3 4)))");
+    check_returned_expression_dump("1 & 2 ^ 3 | 4", "(| (^ (& 1 2) 3) 4)");
+    check_returned_expression_dump("1 ^ 2 & 3", "(^ 1 (& 2 3))");
+    check_returned_expression_dump("1 & 2 ^ 3", "(^ (& 1 2) 3)");
+    check_returned_expression_dump("1 | 2 & 3", "(| 1 (& 2 3))");
+    check_returned_expression_dump("1 | 2 ^ 3", "(| 1 (^ 2 3))");
+}
+/** "& ^ |" bind looser than shifts, and so looser than arithmetic too. */
+static void test_parser_slice_4_bitwise_looser_than_shift(void) {
+    check_returned_expression_dump("1 & 2 << 3", "(& 1 (<< 2 3))");
+    check_returned_expression_dump("1 << 2 | 3", "(| (<< 1 2) 3)");
+    check_returned_expression_dump("6 ^ 1 >> 1", "(^ 6 (>> 1 1))");
+    check_returned_expression_dump("1 + 2 & 3", "(& (+ 1 2) 3)");
+    check_returned_expression_dump("1 | 2 * 3", "(| 1 (* 2 3))");
+}
+/** Operators of the same precedence group to the left, "<<" and ">>" mixed included. */
+static void test_parser_slice_4_left_associativity(void) {
+    check_returned_expression_dump("1 << 2 << 3", "(<< (<< 1 2) 3)");
+    check_returned_expression_dump("64 >> 2 >> 1", "(>> (>> 64 2) 1)");
+    check_returned_expression_dump("16 >> 2 << 1", "(<< (>> 16 2) 1)");
+    check_returned_expression_dump("1 << 4 >> 2", "(>> (<< 1 4) 2)");
+    check_returned_expression_dump("7 & 6 & 4", "(& (& 7 6) 4)");
+    check_returned_expression_dump("1 ^ 2 ^ 3", "(^ (^ 1 2) 3)");
+    check_returned_expression_dump("1 | 2 | 4", "(| (| 1 2) 4)");
+}
+/**
+ * A looser operator after a tighter one returns to the level that accepts it, across several levels: the last '|' in
+ * "1 | 2 & 3 | 4" belongs to the outer '|', not to the '&'s right side.
+ */
+static void test_parser_slice_4_looser_operator_after_tighter(void) {
+    check_returned_expression_dump("1 | 2 & 3 | 4", "(| (| 1 (& 2 3)) 4)");
+    check_returned_expression_dump("1 + 2 << 3 + 4 | 5", "(| (<< (+ 1 2) (+ 3 4)) 5)");
+    check_returned_expression_dump("1 | 2 << 3 * 4 & 5", "(| 1 (& (<< 2 (* 3 4)) 5))");
+    check_returned_expression_dump("1 * 2 | 3 ^ 4 & 5 << 6 + 7", "(| (* 1 2) (^ 3 (& 4 (<< 5 (+ 6 7)))))");
+    check_returned_expression_dump("1 + 2 << 3 & 4 ^ 5 | 6", "(| (^ (& (<< (+ 1 2) 3) 4) 5) 6)");
+}
+/**
+ * A unary operator takes one operand only. "1 << -2" and "-8 >> 1" parse: a negative count is undefined and a
+ * negative left operand of '>>' implementation-defined, but neither is a syntax error.
+ */
+static void test_parser_slice_4_unary_binds_tighter(void) {
+    check_returned_expression_dump("~1 & 2", "(& (~ 1) 2)");
+    check_returned_expression_dump("1 & ~2", "(& 1 (~ 2))");
+    check_returned_expression_dump("!1 | 2", "(| (! 1) 2)");
+    check_returned_expression_dump("-8 >> 1", "(>> (- 8) 1)");
+    check_returned_expression_dump("1 << -2", "(<< 1 (- 2))");
+    check_returned_expression_dump("~1 ^ -2", "(^ (~ 1) (- 2))");
+}
+/** Parentheses override precedence and associativity, and produce no node. */
+static void test_parser_slice_4_parentheses(void) {
+    check_returned_expression_dump("(1 | 2) & 3", "(& (| 1 2) 3)");
+    check_returned_expression_dump("1 << (2 << 3)", "(<< 1 (<< 2 3))");
+    check_returned_expression_dump("(1 << 2) + 1", "(+ (<< 1 2) 1)");
+    check_returned_expression_dump("~(1 ^ 2)", "(~ (^ 1 2))");
+    check_returned_expression_dump("(1 | 2) ^ (3 & 4)", "(^ (| 1 2) (& 3 4))");
+}
+/** A binary expression's range spans its left operand's start to its right operand's end, parentheses included. */
+static void test_parser_slice_4_ranges(void) {
+    check_returned_expression_range("1 << 2", 6);
+    check_returned_expression_range("1 | 2 & 3", 9);
+    check_returned_expression_range("1 << 2 + 1", 10);
+    check_returned_expression_range("(1 | 2) & 3", 11);
+    check_returned_expression_range("~(1 ^ 2)", 8);
+}
+/** "int main(void) { return 1 << 2 + 1; }": slice 4's example program. */
+static void test_parser_slice_4_program(void) {
+    const ParseFixture fixture = parse_fixture_create("int main(void) { return 1 << 2 + 1; }");
+
+    check_dump(&fixture, parser_parse(fixture.parser),
+        "(translation-unit (function-definition main:int(void) (parameters) (block (return (<< 1 (+ 2 1))))))");
+    CHECK(has_no_diagnostics(&fixture));
+
+    parse_fixture_destroy(fixture);
+}
+/** Everything slice 4 has, together, as it would sit in a file. */
+static void test_parser_slice_4_whole_program(void) {
+    const ParseFixture fixture = parse_fixture_create(
+        "int helper(void) {\n"
+        "    return ~(1 << 4) & 255;\n"
+        "}\n"
+        "\n"
+        "int main(void) {\n"
+        "    return (6 ^ 3) | -8 >> 1 % 3;\n"
+        "}\n");
+
+    check_dump(&fixture, parser_parse(fixture.parser),
+        "(translation-unit"
+        " (function-definition helper:int(void) (parameters) (block (return (& (~ (<< 1 4)) 255))))"
+        " (function-definition main:int(void) (parameters) (block (return (| (^ 6 3) (>> (- 8) (% 1 3)))))))");
+    CHECK(has_no_diagnostics(&fixture));
+
+    parse_fixture_destroy(fixture);
+}
+
+// Errors. Left out, because their expectation would flip: "1 & & 2" and "& 2" (unary '&' from slice 11), and anything
+// with '<', '>', "&&" or "||" (slice 5).
+
+/** "int main(void) { return 1 <<; }", "... 1 |; }": no right operand. Reported at the ';'. */
+static void test_parser_slice_4_error_missing_right_operand(void) {
+    check_parse_fails("int main(void) { return 1 <<; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+    check_parse_fails("int main(void) { return 1 >>; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+    check_parse_fails("int main(void) { return 1 |; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 27);
+}
+/** "int main(void) { return << 1; }", "... ^ 1; }", "... | 1; }": these are never prefix. Reported at them, offset 24. */
+static void test_parser_slice_4_error_missing_left_operand(void) {
+    check_parse_fails("int main(void) { return << 1; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+    check_parse_fails("int main(void) { return >> 1; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+    check_parse_fails("int main(void) { return ^ 1; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+    check_parse_fails("int main(void) { return | 1; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+}
+/** "int main(void) { return 1 & | 2; }", "... 1 << >> 2; }": two binary operators in a row. Reported at the second. */
+static void test_parser_slice_4_error_two_binary_operators(void) {
+    check_parse_fails("int main(void) { return 1 & | 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+    check_parse_fails("int main(void) { return 1 << >> 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 29);
+    check_parse_fails("int main(void) { return 1 ^ ^ 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+}
+/** "int main(void) { return (1 | 2; }": the ')' is missing. Reported at the ';', offset 30. */
+static void test_parser_slice_4_error_unclosed_parenthesis(void) {
+    check_parse_fails("int main(void) { return (1 | 2; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 30);
+}
+
 int main(const int argc, char** const argv) {
     harness_init(argc, argv);
 
@@ -1017,6 +1166,24 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_parser_slice_3_error_right_parenthesis_as_operand);
     RUN_TEST(test_parser_slice_3_error_unclosed_parenthesis);
     RUN_TEST(test_parser_slice_3_error_minus_minus_and_plus_plus);
+
+    RUN_TEST(test_parser_slice_4_each_binary_operator);
+    RUN_TEST(test_parser_slice_4_no_whitespace);
+    RUN_TEST(test_parser_slice_4_shift_looser_than_arithmetic);
+    RUN_TEST(test_parser_slice_4_bitwise_precedence);
+    RUN_TEST(test_parser_slice_4_bitwise_looser_than_shift);
+    RUN_TEST(test_parser_slice_4_left_associativity);
+    RUN_TEST(test_parser_slice_4_looser_operator_after_tighter);
+    RUN_TEST(test_parser_slice_4_unary_binds_tighter);
+    RUN_TEST(test_parser_slice_4_parentheses);
+    RUN_TEST(test_parser_slice_4_ranges);
+    RUN_TEST(test_parser_slice_4_program);
+    RUN_TEST(test_parser_slice_4_whole_program);
+
+    RUN_TEST(test_parser_slice_4_error_missing_right_operand);
+    RUN_TEST(test_parser_slice_4_error_missing_left_operand);
+    RUN_TEST(test_parser_slice_4_error_two_binary_operators);
+    RUN_TEST(test_parser_slice_4_error_unclosed_parenthesis);
 
     return harness_finish();
 }

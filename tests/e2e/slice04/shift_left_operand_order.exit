@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of shift_left_operand_order.c (see tests/run_e2e.sh).
+# Swapped operands (2 << 3) give 16.
+12

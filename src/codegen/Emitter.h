@@ -40,6 +40,14 @@ void emitter_emit_imul(Emitter* this, Width width, Operand source, Operand desti
 void emitter_emit_cltd(Emitter* this);
 void emitter_emit_idiv(Emitter* this, Operand divisor);
 
+//      bitwise & shift:
+void emitter_emit_sal(Emitter* this, Width width, Operand source, Operand destination);
+void emitter_emit_sar(Emitter* this, Width width, Operand source, Operand destination);
+
+void emitter_emit_and(Emitter* this, Width width, Operand source, Operand destination);
+void emitter_emit_xor(Emitter* this, Width width, Operand source, Operand destination);
+void emitter_emit_or(Emitter* this, Width width, Operand source, Operand destination);
+
 //      stack:
 void emitter_emit_push(Emitter* this, Operand source);
 void emitter_emit_pop(Emitter* this, Operand destination);

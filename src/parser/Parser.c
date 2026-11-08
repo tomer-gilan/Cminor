@@ -106,6 +106,7 @@ static ExpressionUnaryKind token_kind_to_unary_expression_kind(const TokenKind k
     return UNARY_EXPRESSION_KIND_NONE;
 }
 static ExpressionBinaryKind token_kind_to_binary_expression_kind(const TokenKind kind) {
+    // Arithmetic:
     if (kind == TOKEN_PLUS)
         return BINARY_EXPRESSION_KIND_ADD;
     if (kind == TOKEN_MINUS)
@@ -116,6 +117,17 @@ static ExpressionBinaryKind token_kind_to_binary_expression_kind(const TokenKind
         return BINARY_EXPRESSION_KIND_DIVIDE;
     if (kind == TOKEN_PERCENT)
         return BINARY_EXPRESSION_KIND_MODULO;
+    // Bitwise & Shift:
+    if (kind == TOKEN_LESS_LESS)
+        return BINARY_EXPRESSION_KIND_BINARY_SHIFT_LEFT;
+    if (kind == TOKEN_GREATER_GREATER)
+        return BINARY_EXPRESSION_KIND_BINARY_SHIFT_RIGHT;
+    if (kind == TOKEN_BAR)
+        return BINARY_EXPRESSION_KIND_BITWISE_INCLUSIVE_OR;
+    if (kind == TOKEN_CARET)
+        return BINARY_EXPRESSION_KIND_BITWISE_EXCLUSIVE_OR;
+    if (kind == TOKEN_AMPERSAND)
+        return BINARY_EXPRESSION_KIND_BITWISE_AND;
 
     return BINARY_EXPRESSION_KIND_NONE;
 }
@@ -126,9 +138,9 @@ typedef enum {
     PRECEDENCE_LEVEL_NONE = 0,      // binds the loosest, i.e. does not bind.
     PRECEDENCE_LEVEL_LOGICAL_OR,
     PRECEDENCE_LEVEL_LOGICAL_AND,
-    PRECEDENCE_LEVEL_INCLUSIVE_OR,
-    PRECEDENCE_LEVEL_EXCLUSIVE_OR,
-    PRECEDENCE_LEVEL_AND,
+    PRECEDENCE_LEVEL_BITWISE_INCLUSIVE_OR,
+    PRECEDENCE_LEVEL_BITWISE_EXCLUSIVE_OR,
+    PRECEDENCE_LEVEL_BITWISE_AND,
     PRECEDENCE_LEVEL_EQUALITY,
     PRECEDENCE_LEVEL_RELATIONAL,
     PRECEDENCE_LEVEL_SHIFT,
@@ -139,6 +151,15 @@ typedef enum {
 } PrecedenceLevel;
 static PrecedenceLevel parser_precedence_level_by_expression_binary_kind(const ExpressionBinaryKind kind) {
     switch (kind) {
+        case BINARY_EXPRESSION_KIND_BITWISE_INCLUSIVE_OR:
+            return PRECEDENCE_LEVEL_BITWISE_INCLUSIVE_OR;
+        case BINARY_EXPRESSION_KIND_BITWISE_EXCLUSIVE_OR:
+            return PRECEDENCE_LEVEL_BITWISE_EXCLUSIVE_OR;
+        case BINARY_EXPRESSION_KIND_BITWISE_AND:
+            return PRECEDENCE_LEVEL_BITWISE_AND;
+        case BINARY_EXPRESSION_KIND_BINARY_SHIFT_LEFT:
+        case BINARY_EXPRESSION_KIND_BINARY_SHIFT_RIGHT:
+            return PRECEDENCE_LEVEL_SHIFT;
         case BINARY_EXPRESSION_KIND_ADD:
         case BINARY_EXPRESSION_KIND_SUBTRACT:
             return PRECEDENCE_LEVEL_ADDITIVE;
@@ -146,11 +167,11 @@ static PrecedenceLevel parser_precedence_level_by_expression_binary_kind(const E
         case BINARY_EXPRESSION_KIND_DIVIDE:
         case BINARY_EXPRESSION_KIND_MODULO:
             return PRECEDENCE_LEVEL_MULTIPLICATIVE;
+        default:
         case BINARY_EXPRESSION_KIND_NONE:
         case BINARY_EXPRESSION_KIND__COUNT:
-            break;
+            return PRECEDENCE_LEVEL_NONE;
     }
-    return PRECEDENCE_LEVEL_NONE;
 }
 
 static const ExpressionNode*            parser_expression_node_parse(           Parser* this);

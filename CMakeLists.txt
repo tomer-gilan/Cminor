@@ -204,7 +204,7 @@ endif ()
 # e2e_pending_slices: slices whose tests are written ahead of the compiler. They aren't registered at all, so no test
 # runner (CTest or CLion's) can count them as failed. Not the DISABLED property: CLion reports a disabled test as a
 # failure. Remove a slice from the list once it's implemented.
-set(e2e_pending_slices)
+set(e2e_pending_slices slice04)
 if (UNIX)
     file(GLOB_RECURSE e2e_programs CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/*.c)
     foreach (program IN LISTS e2e_programs)

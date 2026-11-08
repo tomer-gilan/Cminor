@@ -421,13 +421,13 @@ static void emitter_emit_one_operand_instruction(Emitter* const this, const Text
 
     emitter_emit_operand(this, only);
 }
-static void emitter_emit_two_operand_instruction(Emitter* const this, const TextView instruction, const Width width, const Operand source, const Operand destination) {
+static void emitter_emit_two_operand_instruction(Emitter* const this, const TextView instruction, const Width instruction_width, const Operand source, const Operand destination) {
     assert(this != NULL);
 
     printer_print_new_line(this->printer);
 
     printer_print_text_view(this->printer, instruction);
-    emitter_emit_instruction_suffix(this, width);
+    emitter_emit_instruction_suffix(this, instruction_width);
     printer_print_char(this->printer, ' ');
 
     emitter_emit_operand(this, source);
@@ -598,6 +598,71 @@ void emitter_emit_idiv(Emitter* const this, const Operand divisor) {
         text_view_value_of_literal("idiv"),
         width,
         divisor);
+}
+
+static void emitter_emit_shift_instruction(
+    Emitter* const this,
+    const TextView instruction,
+    const Width width,
+    const Operand source,
+    const Operand destination) {
+
+    assert(this != NULL);
+    assert(source.kind != OPERAND_KIND_MEMORY);
+    if (source.kind == OPERAND_KIND_REGISTER)
+        assert(source.as.register_.width == WIDTH_BYTE && source.as.register_.kind == REGISTER_KIND_RCX); // only %cl is supported.
+
+    emitter_emit_two_operand_instruction(
+        this,
+        instruction,
+        width,
+        source,
+        destination);
+}
+
+void emitter_emit_sal(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+
+    emitter_emit_shift_instruction(this, text_view_value_of_literal("sal"), width, source, destination);
+}
+void emitter_emit_sar(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+
+    emitter_emit_shift_instruction(this, text_view_value_of_literal("sar"), width, source, destination);
+}
+
+void emitter_emit_and(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("and"),
+        width,
+        source,
+        destination);
+}
+void emitter_emit_xor(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("xor"),
+        width,
+        source,
+        destination);
+}
+void emitter_emit_or(Emitter* const this, const Width width, const Operand source, const Operand destination) {
+    assert(this != NULL);
+    assert_operands_validness(width, source, destination);
+
+    emitter_emit_two_operand_instruction(
+        this,
+        text_view_value_of_literal("or"),
+        width,
+        source,
+        destination);
 }
 
 /**

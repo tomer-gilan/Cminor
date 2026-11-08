@@ -152,6 +152,25 @@ static void codegen_generate_expression(               Codegen* const this, cons
                     const Operand rdx = operand_make_register(register_make(REGISTER_KIND_RDX, WIDTH_LONG));
                     emitter_emit_mov(this->emitter, width, rdx, rax);
                     break;
+                case BINARY_EXPRESSION_KIND_BINARY_SHIFT_LEFT: {
+                    const Operand rcx_byte = operand_make_register(register_make(REGISTER_KIND_RCX, WIDTH_BYTE));
+                    emitter_emit_sal(this->emitter, width, rcx_byte, rax);
+                }
+                    break;
+                case BINARY_EXPRESSION_KIND_BINARY_SHIFT_RIGHT: {
+                    const Operand rcx_byte = operand_make_register(register_make(REGISTER_KIND_RCX, WIDTH_BYTE));
+                    emitter_emit_sar(this->emitter, width, rcx_byte, rax);
+                }
+                    break;
+                case BINARY_EXPRESSION_KIND_BITWISE_INCLUSIVE_OR:
+                    emitter_emit_or(this->emitter, width, rcx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_BITWISE_EXCLUSIVE_OR:
+                    emitter_emit_xor(this->emitter, width, rcx, rax);
+                    break;
+                case BINARY_EXPRESSION_KIND_BITWISE_AND:
+                    emitter_emit_and(this->emitter, width, rcx, rax);
+                    break;
                 case BINARY_EXPRESSION_KIND_NONE:
                 case BINARY_EXPRESSION_KIND__COUNT:
                     assert(false && "invalid program state");

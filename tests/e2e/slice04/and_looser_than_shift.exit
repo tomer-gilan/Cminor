@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of and_looser_than_shift.c (see tests/run_e2e.sh).
+# << binds tighter than &: 5 & 6. (5 & 3) << 1 is 2, and skipping the & leaves 5.
+4

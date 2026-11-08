@@ -166,6 +166,16 @@ static TokenKind binary_expression_kind_to_token_kind(const ExpressionBinaryKind
             return TOKEN_FORWARD_SLASH;
         case BINARY_EXPRESSION_KIND_MODULO:
             return TOKEN_PERCENT;
+        case BINARY_EXPRESSION_KIND_BINARY_SHIFT_LEFT:
+            return TOKEN_LESS_LESS;
+        case BINARY_EXPRESSION_KIND_BINARY_SHIFT_RIGHT:
+            return TOKEN_GREATER_GREATER;
+        case BINARY_EXPRESSION_KIND_BITWISE_AND:
+            return TOKEN_AMPERSAND;
+        case BINARY_EXPRESSION_KIND_BITWISE_EXCLUSIVE_OR:
+            return TOKEN_CARET;
+        case BINARY_EXPRESSION_KIND_BITWISE_INCLUSIVE_OR:
+            return TOKEN_BAR;
         case BINARY_EXPRESSION_KIND_NONE:
         case BINARY_EXPRESSION_KIND__COUNT:
             break;

@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of bitwise_precedence.c (see tests/run_e2e.sh).
+# & before ^ before |: 1 | (2 ^ (3 & 4)) = 1 | 2. With one level for all three, ((1 | 2) ^ 3) & 4 is 0.
+3

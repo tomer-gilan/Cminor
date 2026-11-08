@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of shift_count_from_shift.c (see tests/run_e2e.sh).
+# The count is itself a shift, computed while 2 waits on the stack: 2 << 2.
+8

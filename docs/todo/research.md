@@ -108,3 +108,26 @@ Background and decisions are in `testing.md`. Open questions:
 - [ ] **One CTest entry per test case, not per executable.** With the hand-rolled harness, one executable is one CTest entry, so a failure shows as a single red "lexer" line. Option: the runner takes a test name as an argument (`test_lexer lex_eq_eq_semicolon`) and CMake registers one `add_test` per name. How do you keep the CMake list of names in sync with the test functions without maintaining it by hand twice? How do frameworks (and CMake's `gtest_discover_tests`, for comparison) solve this?
 - [ ] Mocking in C: what it is, and when (if ever) this project would need it.
 - [ ] Testing that an `assert` fires ("death tests"): how frameworks do it with `fork()`, and whether it's worth it here.
+
+---
+
+## Random test programs: Csmith
+
+**Csmith** (University of Utah) generates random C programs that are free of undefined behavior and print a checksum of
+their global variables. You compile each one with two compilers and compare the outputs (*differential testing*). This
+grows out of the differential check in `codegen-roadmap.md` (Testing, 2.): that one uses hand-written programs, while
+this one uses generated ones.
+
+- [ ] How Csmith avoids undefined behavior (safe-math wrappers, pointer and initialization analysis), and why a generator
+  for a compiler *has* to.
+- [ ] What its output depends on: `csmith.h`, `printf`, `#include`, structs, pointers, loops. How much of that is
+  outside `SUBSET.md` (the preprocessor certainly is), and which command-line options turn features off (`--no-structs`,
+  `--no-pointers`, ...). Can it be cut down to Cminor's subset at all, or only to a later slice's?
+- [ ] If not: what would a minimal home-made generator look like? Random expression trees for `int expr(void)`, gcc as
+  the oracle, `-fsanitize=undefined` to throw out programs with UB, a fixed or printed seed so a failure can be replayed.
+- [ ] **Test-case reduction:** a failing random program is thousands of lines long. What **C-Reduce** (and `cvise`) do
+  with it, and what the "interestingness test" script is.
+- [ ] Related: **YARPGen** (another generator, aimed at optimizers), and what Csmith's paper found when it tested
+  **CompCert** (a formally verified compiler). Which generator fits a non-optimizing compiler better?
+- [ ] Where it runs: random tests aren't deterministic (see `testing.md`), so not in the commit check. A separate CTest
+  label, or a script run by hand?

@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of shift_right_arithmetic.c (see tests/run_e2e.sh).
+# -4 mod 256: >> on a negative int is arithmetic (implementation-defined.md). shrl gives 2147483644, so 252 too: see shift_right_sign_fills.
+252

@@ -514,6 +514,89 @@ static void test_emitter_modulo_sequence(void) {
     CHECK(emitter_output_is(emitter, "\ncltd\nidivl %ecx\nmovl %edx, %eax\n"));
 }
 
+// -------- Shift: sal, sar -------- //
+// Written by Claude on 08-Nov-26.
+
+/**
+ * A variable count can only come from %cl, whatever the destination's width: the suffix comes from the destination
+ * alone, so "sall %cl, %eax" and "sarq %cl, %rax" both name %cl.
+ */
+static void test_emitter_sal_and_sar_count_in_cl(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_sal(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sar(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sal(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_sar(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+
+    CHECK(emitter_output_is(emitter, "\nsall %cl, %eax\nsarl %cl, %eax\nsalq %cl, %rax\nsarq %cl, %rax\n"));
+}
+/** The other count is an immediate, and the destination may be memory; the given width alone picks the suffix there. */
+static void test_emitter_sal_and_sar_immediate_and_memory(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_sal(emitter, WIDTH_LONG, operand_make_immediate(2), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sar(emitter, WIDTH_LONG, operand_make_immediate(31), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_sal(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     base_operand(REGISTER_KIND_RBP, -4));
+    emitter_emit_sar(emitter, WIDTH_QUAD, operand_make_immediate(3), base_operand(REGISTER_KIND_RBP, -8));
+
+    CHECK(emitter_output_is(emitter, "\nsall $2, %eax\nsarl $31, %eax\nsall %cl, -4(%rbp)\nsarq $3, -8(%rbp)\n"));
+}
+/**
+ * The slice 4 shape of a >> b: the stack machine leaves a in %eax and b in %ecx, so the count is already in %cl, with
+ * no extra move.
+ */
+static void test_emitter_shift_sequence(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_mov(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RAX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RCX, WIDTH_LONG));
+    emitter_emit_pop(emitter, register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_sar(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_BYTE),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+
+    CHECK(emitter_output_is(emitter, "\nmovl %eax, %ecx\npopq %rax\nsarl %cl, %eax\n"));
+}
+
+// -------- Bitwise: and, xor, or -------- //
+// Written by Claude on 08-Nov-26.
+
+/** "op source, destination", like add: destination op source into destination. */
+static void test_emitter_and_xor_or_registers(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_and(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_xor(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_or(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RCX, WIDTH_LONG),
+                    register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_and(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_xor(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                     register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+    emitter_emit_or(emitter, WIDTH_QUAD, register_operand(REGISTER_KIND_RCX, WIDTH_QUAD),
+                    register_operand(REGISTER_KIND_RAX, WIDTH_QUAD));
+
+    CHECK(emitter_output_is(emitter, "\nandl %ecx, %eax\nxorl %ecx, %eax\norl %ecx, %eax\n"
+                                     "andq %rcx, %rax\nxorq %rcx, %rax\norq %rcx, %rax\n"));
+}
+/** The operand combinations and, xor and or share with add: an immediate or memory source, or a memory destination. */
+static void test_emitter_and_xor_or_immediate_and_memory(void) {
+    Emitter* const emitter = emitter_create();
+    emitter_emit_and(emitter, WIDTH_LONG, operand_make_immediate(255), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_xor(emitter, WIDTH_LONG, operand_make_immediate(-1), register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_or(emitter, WIDTH_LONG, base_operand(REGISTER_KIND_RBP, -4),
+                    register_operand(REGISTER_KIND_RAX, WIDTH_LONG));
+    emitter_emit_and(emitter, WIDTH_LONG, register_operand(REGISTER_KIND_RAX, WIDTH_LONG),
+                     base_operand(REGISTER_KIND_RBP, -4));
+    emitter_emit_xor(emitter, WIDTH_BYTE, operand_make_immediate(1), base_operand(REGISTER_KIND_RBP, -1));
+
+    CHECK(emitter_output_is(emitter, "\nandl $255, %eax\nxorl $-1, %eax\norl -4(%rbp), %eax\n"
+                                     "andl %eax, -4(%rbp)\nxorb $1, -1(%rbp)\n"));
+}
+
 // -------- Stack: push, pop -------- //
 
 /** In 64-bit mode push and pop always move 8 bytes, so the suffix is always q (pushl doesn't exist). */
@@ -621,6 +704,13 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_emitter_cltd);
     RUN_TEST(test_emitter_idiv);
     RUN_TEST(test_emitter_modulo_sequence);
+
+    RUN_TEST(test_emitter_sal_and_sar_count_in_cl);
+    RUN_TEST(test_emitter_sal_and_sar_immediate_and_memory);
+    RUN_TEST(test_emitter_shift_sequence);
+
+    RUN_TEST(test_emitter_and_xor_or_registers);
+    RUN_TEST(test_emitter_and_xor_or_immediate_and_memory);
 
     RUN_TEST(test_emitter_push_and_pop_registers);
     RUN_TEST(test_emitter_push_and_pop_memory_and_immediate);

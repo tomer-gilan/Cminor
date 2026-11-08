@@ -1,0 +1,3 @@
+# Written by Claude on 08-Nov-26. Expected exit status of and_with_negative.c (see tests/run_e2e.sh).
+# ...11111010 & 00001111 = 1010: a negative left operand.
+10

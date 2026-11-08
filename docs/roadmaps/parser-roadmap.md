@@ -177,28 +177,28 @@ Each step lists what's parsed, the AST it adds, the tests, and the gotchas.
 
 **Step 2: Unary operators and parentheses**
 
-- [ ] **The AST dump** (moved here from Step 0e). Specify the format (S-expressions recommended: `(+ 1 (* 2 3))`,
+- [x] **The AST dump** (moved here from Step 0e). Specify the format (S-expressions recommended: `(+ 1 (* 2 3))`,
   `(return (int 2))`, `(func main int (params) (block ...))`): deterministic, stable, readable, and complete enough.
   Decide which fields are dumped: ranges or not (recommended: not in the unit-test dump, maybe behind a flag), and
   types or not (sema's dump will add them, see `sema-roadmap.md`). It's the test oracle from this step on.
-- [ ] Test plumbing (Claude): a helper that parses a string, dumps the AST, and compares it to an expected string,
+- [x] Test plumbing (Claude): a helper that parses a string, dumps the AST, and compares it to an expected string,
   printing both on a mismatch. Move slice 1's field-by-field tests to dump strings, keeping ranges in a few dedicated
   tests.
-- [ ] Unary `- ~ !` and `+` (all of the prefix operators except `*` and `&`, which come in Step 11), and `( expr )`.
-- [ ] AST: unary node.
-- [ ] Tests: `-2`, `~-2`, `!!1`, `-(-(2))`, `(((2)))`.
-- [ ] Error tests: `()`, `(2`, `-` followed by `;`.
-- [ ] Error tests: `--2` and `++2` (touching same signs). `- -2`, `-(-2)` and `-+2` are fine.
+- [x] Unary `- ~ !` and `+` (all of the prefix operators except `*` and `&`, which come in Step 11), and `( expr )`.
+- [x] AST: unary node.
+- [x] Tests: `-2`, `~-2`, `!!1`, `-(-(2))`, `(((2)))`.
+- [x] Error tests: `()`, `(2`, `-` followed by `;`.
+- [x] Error tests: `--2` and `++2` (touching same signs). `- -2`, `-(-2)` and `-+2` are fine.
 - Gotchas: the `--` check needs ranges, not just token kinds, since the lexer drops whitespace. Parentheses produce no node, so the inner node's range is widened
   to include them (ADR-016, decided 2026-11-06).
 
 **Step 3: Arithmetic**
 
-- [ ] Binary `* / %` and `+ -`: precedence climbing is introduced here.
-- [ ] AST: binary node.
-- [ ] Tests: precedence (`1 + 2 * 3`), left associativity (`1 - 2 - 3` → `(- (- 1 2) 3)`, `8 / 4 / 2`), mixing with
+- [x] Binary `* / %` and `+ -`: precedence climbing is introduced here.
+- [x] AST: binary node.
+- [x] Tests: precedence (`1 + 2 * 3`), left associativity (`1 - 2 - 3` → `(- (- 1 2) 3)`, `8 / 4 / 2`), mixing with
   unary operators (`-1 * -2`, `-(1 + 2)`).
-- [ ] Error tests: `1 +`, `* 2` (until Step 11), `1 2`.
+- [x] Error tests: `1 +`, `* 2` (until Step 11), `1 2`.
 - Gotcha: division by a constant zero isn't a parser error. The parser accepts `1 / 0`.
 
 **Step 4: Bitwise and shift**
