@@ -189,8 +189,8 @@ Each step lists what's parsed, the AST it adds, the tests, and the gotchas.
 - [ ] Tests: `-2`, `~-2`, `!!1`, `-(-(2))`, `(((2)))`.
 - [ ] Error tests: `()`, `(2`, `-` followed by `;`.
 - [ ] Error tests: `--2` and `++2` (touching same signs). `- -2`, `-(-2)` and `-+2` are fine.
-- Gotchas: the `--` check needs ranges, not just token kinds, since the lexer drops whitespace. Parentheses produce no node, but the inner node's range is the *inner*
-  expression's, so decide whether that's fine for diagnostics.
+- Gotchas: the `--` check needs ranges, not just token kinds, since the lexer drops whitespace. Parentheses produce no node, so the inner node's range is widened
+  to include them (ADR-016, decided 2026-11-06).
 
 **Step 3: Arithmetic**
 

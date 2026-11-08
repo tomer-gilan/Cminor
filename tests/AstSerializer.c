@@ -137,7 +137,7 @@ static void ast_serializer_serialize_declarator(AstSerializer* const this, const
 
 // Expressions:
 
-static TokenKind unary_expression_kind_to_token_kind(const UnaryExpressionKind kind) {
+static TokenKind unary_expression_kind_to_token_kind(const ExpressionUnaryKind kind) {
     switch (kind) {
         case UNARY_EXPRESSION_KIND_BINARY_NEGATE:
             return TOKEN_TILDE;
@@ -152,6 +152,25 @@ static TokenKind unary_expression_kind_to_token_kind(const UnaryExpressionKind k
             break;
     }
     assert(false && "not a unary operator");
+    return TOKEN_NONE;
+}
+static TokenKind binary_expression_kind_to_token_kind(const ExpressionBinaryKind kind) {
+    switch (kind) {
+        case BINARY_EXPRESSION_KIND_ADD:
+            return TOKEN_PLUS;
+        case BINARY_EXPRESSION_KIND_SUBTRACT:
+            return TOKEN_MINUS;
+        case BINARY_EXPRESSION_KIND_MULTIPLY:
+            return TOKEN_STAR;
+        case BINARY_EXPRESSION_KIND_DIVIDE:
+            return TOKEN_FORWARD_SLASH;
+        case BINARY_EXPRESSION_KIND_MODULO:
+            return TOKEN_PERCENT;
+        case BINARY_EXPRESSION_KIND_NONE:
+        case BINARY_EXPRESSION_KIND__COUNT:
+            break;
+    }
+    assert(false && "not a binary operator");
     return TOKEN_NONE;
 }
 
@@ -170,6 +189,15 @@ static void ast_serializer_serialize_expression(AstSerializer* const this, const
             ast_serializer_serialize_expression_type(this, expression_node);
             ast_serializer_begin_child(this, CHILD_PLACEMENT_SAME_LINE);
             ast_serializer_serialize_expression(this, expression_node->as.unary.operand);
+            ast_serializer_close_form(this);
+            break;
+        case EXPRESSION_KIND_BINARY:
+            ast_serializer_open_form(this, token_kind_get_spelling(binary_expression_kind_to_token_kind(expression_node->as.binary.kind)));
+            ast_serializer_serialize_expression_type(this, expression_node);
+            ast_serializer_begin_child(this, CHILD_PLACEMENT_SAME_LINE);
+            ast_serializer_serialize_expression(this, expression_node->as.binary.left);
+            ast_serializer_begin_child(this, CHILD_PLACEMENT_SAME_LINE);
+            ast_serializer_serialize_expression(this, expression_node->as.binary.right);
             ast_serializer_close_form(this);
             break;
         case EXPRESSION_KIND__COUNT:

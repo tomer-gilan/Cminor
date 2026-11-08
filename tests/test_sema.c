@@ -1,13 +1,14 @@
 //
 // Written by Claude on 19-Oct-26.
 //
-// Sema tests for slices 1 and 2. Each test lexes, parses and analyzes a source string. A valid program must give no
+// Sema tests for slices 1 to 3. Each test lexes, parses and analyzes a source string. A valid program must give no
 // diagnostics and a type for every expression. An invalid one must give exactly one diagnostic (sema stops at the first
 // error, ADR-025), with the expected code and offset. Tests read sema's table directly, through each expression node's
 // id (ADR-023), or compare the typed dump (check_typed_dump, since 31-Oct-26).
 // Expected values come from SUBSET.md and the C standard, not from sema's output.
 //
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -271,6 +272,87 @@ static void test_sema_slice_2_parentheses(void) {
     check_returns_int("int main(void) { return (((2))); }", 1);
 }
 
+// ---------------- Slice 3: arithmetic ---------------- //
+// Written by Claude on 06-Nov-26.
+// No error tests: every operand is an int until pointers (slice 11).
+
+/**
+ * Checks that sema accepts "int main(void) { return <expression_source>; }", and that the returned expression's typed
+ * dump is exactly @b expected_expression_dump (ast-dump-format.md, Typed mode). This pins every node's type, not only
+ * the outermost one.
+ */
+static void check_returned_expression_typed_dump(
+    const char* const expression_source,
+    const char* const expected_expression_dump) {
+    char source[128];
+    const int source_length = snprintf(source, sizeof source, "int main(void) { return %s; }", expression_source);
+    assert(0 < source_length && source_length < (int)sizeof source);
+    char expected[256];
+    const int expected_length = snprintf(expected, sizeof expected,
+        "(translation-unit (function-definition main:int(void) (parameters) (block (return %s))))",
+        expected_expression_dump);
+    assert(0 < expected_length && expected_length < (int)sizeof expected);
+
+    const SemaFixture fixture = sema_fixture_create(source);
+    if (check_sema_passes(&fixture))
+        check_typed_dump(&fixture, expected);
+    sema_fixture_destroy(fixture);
+}
+
+/** "1 + 2", "1 - 2", "1 * 2", "1 / 2", "1 % 2": each operator on two ints is an int (C11 6.3.1.8), three expressions. */
+static void test_sema_slice_3_each_binary_operator(void) {
+    check_returns_int("int main(void) { return 1 + 2; }", 3);
+    check_returns_int("int main(void) { return 1 - 2; }", 3);
+    check_returns_int("int main(void) { return 1 * 2; }", 3);
+    check_returns_int("int main(void) { return 1 / 2; }", 3);
+    check_returns_int("int main(void) { return 1 % 2; }", 3);
+}
+/** Nested binary operators, with unary operators and parentheses. Parentheses add no expression. */
+static void test_sema_slice_3_nested_expressions(void) {
+    check_returns_int("int main(void) { return 1 + 2 * 3; }", 5);
+    check_returns_int("int main(void) { return 1 - 2 - 3; }", 5);
+    check_returns_int("int main(void) { return -1 * -2; }", 5);
+    check_returns_int("int main(void) { return -(1 + 2); }", 4);
+    check_returns_int("int main(void) { return (1 + 2) * 3; }", 5);
+    check_returns_int("int main(void) { return ((1) + (2)); }", 3);
+}
+/** Every node of a binary expression gets a type: both operands and the operator, however deep. */
+static void test_sema_slice_3_typed_dump(void) {
+    check_returned_expression_typed_dump("1 + 2", "(+:int 1:int 2:int)");
+    check_returned_expression_typed_dump("1 + 2 * 3", "(+:int 1:int (*:int 2:int 3:int))");
+    check_returned_expression_typed_dump("1 - 2 - 3", "(-:int (-:int 1:int 2:int) 3:int)");
+    check_returned_expression_typed_dump("-1 * -2", "(*:int (-:int 1:int) (-:int 2:int))");
+    check_returned_expression_typed_dump("-(1 + 2)", "(-:int (+:int 1:int 2:int))");
+    check_returned_expression_typed_dump("(1 + 2) * 3", "(*:int (+:int 1:int 2:int) 3:int)");
+}
+/** "1 / 0", "1 % 0": division by zero is undefined at run time, not a constraint violation, so sema accepts both. */
+static void test_sema_slice_3_division_by_zero_is_accepted(void) {
+    check_returns_int("int main(void) { return 1 / 0; }", 3);
+    check_returns_int("int main(void) { return 1 % 0; }", 3);
+}
+/** Everything slice 3 has, together, as it would sit in a file. */
+static void test_sema_slice_3_whole_program(void) {
+    const SemaFixture fixture = sema_fixture_create(
+        "int helper(void) {\n"
+        "    return 10 - 3 - 2;\n"
+        "}\n"
+        "\n"
+        "int main(void) {\n"
+        "    return -(1 + 2) * 3 % 4;\n"
+        "}\n");
+
+    if (check_sema_passes(&fixture)) {
+        CHECK(fixture.result.expressions_count == 13);
+        check_typed_dump(&fixture,
+            "(translation-unit"
+            " (function-definition helper:int(void) (parameters) (block (return (-:int (-:int 10:int 3:int) 2:int))))"
+            " (function-definition main:int(void) (parameters)"
+            " (block (return (%:int (*:int (-:int (+:int 1:int 2:int)) 3:int) 4:int)))))");
+    }
+
+    sema_fixture_destroy(fixture);
+}
+
 int main(const int argc, char** const argv) {
     harness_init(argc, argv);
 
@@ -285,6 +367,12 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_sema_slice_2_each_unary_operator);
     RUN_TEST(test_sema_slice_2_nested_unary);
     RUN_TEST(test_sema_slice_2_parentheses);
+
+    RUN_TEST(test_sema_slice_3_each_binary_operator);
+    RUN_TEST(test_sema_slice_3_nested_expressions);
+    RUN_TEST(test_sema_slice_3_typed_dump);
+    RUN_TEST(test_sema_slice_3_division_by_zero_is_accepted);
+    RUN_TEST(test_sema_slice_3_whole_program);
 
     return harness_finish();
 }

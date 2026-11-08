@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of subtract_nested_right.c (see tests/run_e2e.sh).
+# 10 - 1. Catches a left value kept in a register that the nested right side overwrites.
+9

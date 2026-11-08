@@ -11,9 +11,9 @@ const int CHAR_TYPE_SIZE = 1;       // the standard says so
 const int INT_TYPE_SIZE = 4;        // x64, as stated in implementation-defined.md
 const int POINTER_TYPE_SIZE = 8;    // x64, as stated in implementation-defined.md
 
-const static Type TYPE_VOID = {.kind = TYPE_KIND_VOID};
-const static Type TYPE_CHAR = {.kind = TYPE_KIND_CHAR};
-const static Type TYPE_INT = {.kind = TYPE_KIND_INT};
+static const Type TYPE_VOID = {.kind = TYPE_KIND_VOID};
+static const Type TYPE_CHAR = {.kind = TYPE_KIND_CHAR};
+static const Type TYPE_INT = {.kind = TYPE_KIND_INT};
 
 static bool type_function_are_equal(const TypeFunction first, const TypeFunction second) {
     if (first.parameters_count != second.parameters_count ||
@@ -47,6 +47,8 @@ bool type_are_equal(const Type* first, const Type* second) {
             return type_pointer_are_equal(first->as.pointer, second->as.pointer);
         case TYPE_KIND_FUNCTION:
             return type_function_are_equal(first->as.function, second->as.function);
+        case TYPE_KIND__COUNT:
+        case TYPE_KIND_NONE:
         default:
             assert(false && "invalid type");
             return false;
@@ -77,6 +79,8 @@ int type_get_size(const Type* const this) {
             return type_pointer_get_size();
         case TYPE_KIND_FUNCTION:
         case TYPE_KIND_VOID:
+        case TYPE_KIND__COUNT:
+        case TYPE_KIND_NONE:
         default:
             assert(false && "this type has no size");
             return -1;
@@ -93,6 +97,8 @@ const Type* type_get_singleton(const TypeKind kind) {
         case TYPE_KIND_FUNCTION:
         case TYPE_KIND_ARRAY:
         case TYPE_KIND_POINTER:
+        case TYPE_KIND__COUNT:
+        case TYPE_KIND_NONE:
         default:
             assert(false && "non-singleton type kind");
             return NULL;

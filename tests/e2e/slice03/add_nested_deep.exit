@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of add_nested_deep.c (see tests/run_e2e.sh).
+# Four values wait on the stack at once. Catches an unbalanced push or pop.
+15

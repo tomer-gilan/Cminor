@@ -21,7 +21,7 @@ struct Parser {
     int expression_id_counter;
 };
 
-// static:
+// diagnostics:
 
 static void parser_set_error(Parser* this) {
     this->error = true;
@@ -37,6 +37,8 @@ static void parser_report_diagnostic(Parser* const this, const DiagnosticCode co
     parser_set_error(this);
     context_report_diagnostic(this->context, code, range);
 }
+
+// token stream:
 
 static const Token* parser_peek(const Parser* const this) {
     assert(this != NULL);
@@ -76,6 +78,8 @@ static const Token* parser_expect_type(Parser* const this) {
     return parser_pop(this);
 }
 
+// misc:
+
 static int parser_generate_next_expression_id(Parser* const this) {
     assert(this != NULL);
 
@@ -89,7 +93,7 @@ static Arena* parser_get_arena(Parser* const this) {
 
 // convertors:
 
-static UnaryExpressionKind token_to_unary_expression_kind(const TokenKind kind) {
+static ExpressionUnaryKind token_kind_to_unary_expression_kind(const TokenKind kind) {
     if (kind == TOKEN_TILDE)
         return UNARY_EXPRESSION_KIND_BINARY_NEGATE;
     if (kind == TOKEN_EXCLAMATION)
@@ -101,36 +105,118 @@ static UnaryExpressionKind token_to_unary_expression_kind(const TokenKind kind) 
 
     return UNARY_EXPRESSION_KIND_NONE;
 }
+static ExpressionBinaryKind token_kind_to_binary_expression_kind(const TokenKind kind) {
+    if (kind == TOKEN_PLUS)
+        return BINARY_EXPRESSION_KIND_ADD;
+    if (kind == TOKEN_MINUS)
+        return BINARY_EXPRESSION_KIND_SUBTRACT;
+    if (kind == TOKEN_STAR)
+        return BINARY_EXPRESSION_KIND_MULTIPLY;
+    if (kind == TOKEN_FORWARD_SLASH)
+        return BINARY_EXPRESSION_KIND_DIVIDE;
+    if (kind == TOKEN_PERCENT)
+        return BINARY_EXPRESSION_KIND_MODULO;
+
+    return BINARY_EXPRESSION_KIND_NONE;
+}
 
 // parsing:
 
-static const ExpressionNode*            parser_expression_node_parse(           Parser* const this) {
+typedef enum {
+    PRECEDENCE_LEVEL_NONE = 0,      // binds the loosest, i.e. does not bind.
+    PRECEDENCE_LEVEL_LOGICAL_OR,
+    PRECEDENCE_LEVEL_LOGICAL_AND,
+    PRECEDENCE_LEVEL_INCLUSIVE_OR,
+    PRECEDENCE_LEVEL_EXCLUSIVE_OR,
+    PRECEDENCE_LEVEL_AND,
+    PRECEDENCE_LEVEL_EQUALITY,
+    PRECEDENCE_LEVEL_RELATIONAL,
+    PRECEDENCE_LEVEL_SHIFT,
+    PRECEDENCE_LEVEL_ADDITIVE,
+    PRECEDENCE_LEVEL_MULTIPLICATIVE,
+
+    PRECEDENCE_LEVEL_COUNT
+} PrecedenceLevel;
+static PrecedenceLevel parser_precedence_level_by_expression_binary_kind(const ExpressionBinaryKind kind) {
+    switch (kind) {
+        case BINARY_EXPRESSION_KIND_ADD:
+        case BINARY_EXPRESSION_KIND_SUBTRACT:
+            return PRECEDENCE_LEVEL_ADDITIVE;
+        case BINARY_EXPRESSION_KIND_MULTIPLY:
+        case BINARY_EXPRESSION_KIND_DIVIDE:
+        case BINARY_EXPRESSION_KIND_MODULO:
+            return PRECEDENCE_LEVEL_MULTIPLICATIVE;
+        case BINARY_EXPRESSION_KIND_NONE:
+        case BINARY_EXPRESSION_KIND__COUNT:
+            break;
+    }
+    return PRECEDENCE_LEVEL_NONE;
+}
+
+static const ExpressionNode*            parser_expression_node_parse(           Parser* this);
+
+/*
+ * Explanation on expression parsing.
+ * Why do we have three different expression parsing functions?
+ * first of all, shorthands:
+ * node     := parser_expression_node_parse
+ * binary   := parser_expression_node_binary_parse
+ * operand  := parser_expression_node_operand_parse
+ *
+ * Q: Why not have the node call itself when seeing a unary, i.e. -()
+ * A: For example "-1 + 2" would be naively interpreted as -(1 + 2).
+ *    So we need a way to parse only 'basic', 'simple' expressions which have a more closed
+ *    structure, like:
+ *      int constants e.g. 42
+ *      unary e.g. -~1
+ *      parenthesised expressions e.g. (1 + 2)
+ * Q: if node simply calls binary, why not merge them?
+ * A: A return statement that calls node should not know what is precedence climbing is.
+ *    So this split has good, intended abstraction of the parsing.
+ *
+ * Who calls who?
+* node:
+*   simply calls binary.
+* binary:
+*   calls operand then loops and calls binary.
+* operand:
+*   itself (operand): as part of a unary (rather then the node to avoid the "-1 + 2" vs. "-(1 + 2)" issue creeping back)
+*   node: as part of parenthesized expression.
+ */
+
+static const ExpressionNode*            parser_expression_node_operand_parse(   Parser* const this) {
     assert(this != NULL);
     if (parser_has_error(this))
         return NULL;
 
+    ExpressionNode expression;
+
     const TokenKind kind = parser_peek(this)->kind;
+    const ExpressionUnaryKind unary_expression_kind = token_kind_to_unary_expression_kind(kind);
     // parenthesized expression:
     if (kind == TOKEN_PARENTHESES_LEFT) {
-        parser_expect(this, TOKEN_PARENTHESES_LEFT);
+        const Token* const token_parentheses_left = parser_expect(this, TOKEN_PARENTHESES_LEFT);
         if (parser_has_error(this))
             return NULL;
-        const ExpressionNode* const to_return = parser_expression_node_parse(this);
+
+        const ExpressionNode* const expression_node = parser_expression_node_parse(this);
         if (parser_has_error(this))
             return NULL;
-        parser_expect(this, TOKEN_PARENTHESES_RIGHT);
+        expression = *expression_node;
+
+        const Token* const token_parentheses_right = parser_expect(this, TOKEN_PARENTHESES_RIGHT);
         if (parser_has_error(this))
             return NULL;
-        return to_return;
+
+        expression.range = range_union(token_parentheses_left->range, token_parentheses_right->range);
     }
     // constant int expression:
-    if (kind == TOKEN_CONST_INT) {
+    else if (kind == TOKEN_CONST_INT) {
         const Token* const token_constant_int = parser_expect(this, TOKEN_CONST_INT);
         if (parser_has_error(this))
             return NULL;
 
-        ExpressionNode* const to_return = arena_malloc(parser_get_arena(this), sizeof (ExpressionNode));
-        *to_return = (ExpressionNode){
+        expression = (ExpressionNode){
             .range = token_constant_int->range,
             .id = parser_generate_next_expression_id(this),
             .kind = EXPRESSION_KIND_INT_CONSTANT,
@@ -138,19 +224,16 @@ static const ExpressionNode*            parser_expression_node_parse(           
                 .value = token_constant_int->as.value
             }
         };
-        return to_return;
     }
     // unary expression:
-    const UnaryExpressionKind unary_expression_kind = token_to_unary_expression_kind(parser_peek(this)->kind);
-    if (unary_expression_kind != UNARY_EXPRESSION_KIND_NONE) {
+    else if (unary_expression_kind != UNARY_EXPRESSION_KIND_NONE) {
         const Token* const token_unary_punctuator = parser_pop(this);
 
-        const ExpressionNode* const operand = parser_expression_node_parse(this);
+        const ExpressionNode* const operand = parser_expression_node_operand_parse(this);
         if (parser_has_error(this))
             return NULL;
 
-        ExpressionNode* const to_return = arena_malloc(parser_get_arena(this), sizeof (ExpressionNode));
-        *to_return = (ExpressionNode){
+        expression = (ExpressionNode){
             .range = range_union(token_unary_punctuator->range, operand->range),
             .id = parser_generate_next_expression_id(this),
             .kind = EXPRESSION_KIND_UNARY,
@@ -159,16 +242,61 @@ static const ExpressionNode*            parser_expression_node_parse(           
                 .operand = operand
             }
         };
-        return to_return;
     }
-    //
+    else {
+        parser_report_diagnostic(
+            this,
+            DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION,
+            parser_peek(this)->range);
+        return NULL;
+    }
 
-    parser_report_diagnostic(
-        this,
-        DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION,
-        parser_peek(this)->range);
-    return NULL;
+    ExpressionNode* const to_return = arena_malloc(parser_get_arena(this), sizeof (ExpressionNode));
+    *to_return = expression;
+
+    return to_return;
 }
+static const ExpressionNode*            parser_expression_node_binary_parse(    Parser* const this, const PrecedenceLevel minimum_precedence) {
+    assert(this != NULL);
+    if (parser_has_error(this))
+        return NULL;
+
+    const ExpressionNode* left = parser_expression_node_operand_parse(this);
+    if (parser_has_error(this))
+        return NULL;
+
+    PrecedenceLevel precedence_level = PRECEDENCE_LEVEL_NONE;
+    for (ExpressionBinaryKind kind = token_kind_to_binary_expression_kind(parser_peek(this)->kind);         // "int i = 0"
+        (precedence_level = parser_precedence_level_by_expression_binary_kind(kind)) >= minimum_precedence; // "i < n"
+        kind = token_kind_to_binary_expression_kind(parser_peek(this)->kind)) {                             // "i++"
+        parser_pop(this); // pops the binary operator.
+        const ExpressionNode* right = parser_expression_node_binary_parse(this, precedence_level + 1);
+        if (parser_has_error(this))
+            return NULL;
+
+        ExpressionNode* new_left = arena_malloc(parser_get_arena(this), sizeof (ExpressionNode));
+        *new_left = (ExpressionNode){
+            .range = range_union(left->range, right->range),
+            .id = parser_generate_next_expression_id(this),
+            .kind = EXPRESSION_KIND_BINARY,
+            .as.binary = {
+                .kind = kind,
+                .left = left,
+                .right = right
+            }
+        };
+        left = new_left;
+    }
+    return left;
+}
+static const ExpressionNode*            parser_expression_node_parse(           Parser* const this) {
+    assert(this != NULL);
+    if (parser_has_error(this))
+        return NULL;
+
+    return parser_expression_node_binary_parse(this, PRECEDENCE_LEVEL_LOGICAL_OR);
+}
+
 static const StatementNode*             parser_statement_node_parse(            Parser* const this) {
     assert(this != NULL);
     if (parser_has_error(this))
@@ -180,9 +308,11 @@ static const StatementNode*             parser_statement_node_parse(            
         const Token* const token_return = parser_expect(this, TOKEN_KW_RETURN);
         if (parser_has_error(this))
             return NULL;
+
         const ExpressionNode* const return_expression = parser_expression_node_parse(this);
         if (parser_has_error(this))
             return NULL;
+
         const Token* const token_semicolon = parser_expect(this, TOKEN_SEMICOLON);
         if (parser_has_error(this))
             return NULL;

@@ -11,8 +11,9 @@ Binding: code that disagrees with them is a bug (or this doc has to change first
 
 ## 1. Result
 
-The value ends up in `%rax`. The returned `Width` says how much of `%rax` holds it: `WIDTH_LONG` for `%eax` (an
-`int`), `WIDTH_QUAD` for all of `%rax` (a pointer).
+The value ends up in `%rax`. `codegen_generate_expression` returns nothing: the expression's type in sema's table
+(ADR-024) says how much of `%rax` holds the value: `WIDTH_LONG` for `%eax` (an `int`), `WIDTH_QUAD` for all of `%rax`
+(a pointer).
 
 ## 2. Preserved registers: `%rbp` only
 

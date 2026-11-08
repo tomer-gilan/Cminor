@@ -649,7 +649,7 @@ static void check_returned_expression_dump(
 }
 /**
  * Checks that "int main(void) { return <expression_source>; }" parses with no diagnostics, and that the returned
- * expression spans @b length bytes from its start: the operator through the end of its operand.
+ * expression spans @b length bytes from its start: its first token through its last, parentheses included (ADR-016).
  */
 static void check_returned_expression_range(const char* const expression_source, const int length) {
     const ParseFixture fixture = parse_fixture_create_returning(expression_source);
@@ -699,14 +699,25 @@ static void test_parser_slice_2_unary_and_parentheses(void) {
 }
 /**
  * "-2", "~-2", "- -2", "-~!+2": a unary expression's range spans its operator and its operand, the space in "- -2"
- * included. Operands in parentheses aren't checked: whether the range reaches the closing ')' is still open
- * (parser-roadmap.md, Step 2 gotchas).
+ * included.
  */
 static void test_parser_slice_2_unary_ranges(void) {
     check_returned_expression_range("-2", 2);
     check_returned_expression_range("~-2", 3);
     check_returned_expression_range("- -2", 4);
     check_returned_expression_range("-~!+2", 5);
+}
+/**
+ * "(2)", "( 2 )", "((2))", "(-2)", "-(2)", "-( 2 )": parentheses produce no node, so the inner node's range is widened
+ * to include them (ADR-016), and an operator's range reaches its operand's closing ')'.
+ */
+static void test_parser_slice_2_parentheses_ranges(void) {
+    check_returned_expression_range("(2)", 3);
+    check_returned_expression_range("( 2 )", 5);
+    check_returned_expression_range("((2))", 5);
+    check_returned_expression_range("(-2)", 4);
+    check_returned_expression_range("-(2)", 4);
+    check_returned_expression_range("-( 2 )", 6);
 }
 /** "int main(void) { return -(~2); }": slice 2's example program. */
 static void test_parser_slice_2_program(void) {
@@ -786,6 +797,152 @@ static void test_parser_slice_2_error_operator_after_operand(void) {
     check_parse_fails("int main(void) { return 2 ~; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 26);
 }
 
+// ---------------- Slice 3: arithmetic ---------------- //
+// Written by Claude on 06-Nov-26.
+
+/** "1 + 2", "1 - 2", "1 * 2", "1 / 2", "1 % 2": each binary operator of slice 3 is a node with two operands. */
+static void test_parser_slice_3_each_binary_operator(void) {
+    check_returned_expression_dump("1 + 2", "(+ 1 2)");
+    check_returned_expression_dump("1 - 2", "(- 1 2)");
+    check_returned_expression_dump("1 * 2", "(* 1 2)");
+    check_returned_expression_dump("1 / 2", "(/ 1 2)");
+    check_returned_expression_dump("1 % 2", "(% 1 2)");
+}
+/** Whitespace doesn't matter between a binary operator and its operands, unlike between two signs (slice 2). */
+static void test_parser_slice_3_no_whitespace(void) {
+    check_returned_expression_dump("1+2*3", "(+ 1 (* 2 3))");
+    check_returned_expression_dump("1-2", "(- 1 2)");
+}
+/** "* / %" bind tighter than "+ -", whichever comes first. */
+static void test_parser_slice_3_precedence(void) {
+    check_returned_expression_dump("1 + 2 * 3", "(+ 1 (* 2 3))");
+    check_returned_expression_dump("2 * 3 + 4", "(+ (* 2 3) 4)");
+    check_returned_expression_dump("1 - 6 / 3", "(- 1 (/ 6 3))");
+    check_returned_expression_dump("8 % 3 + 1", "(+ (% 8 3) 1)");
+    check_returned_expression_dump("1 * 2 + 3 * 4", "(+ (* 1 2) (* 3 4))");
+}
+/**
+ * A looser operator after a tighter one returns to the level that accepts it. In "1 - 2 * 3 - 4", the second '-' must
+ * not become part of the first '-'s right side: that would be 1 - ((2 * 3) - 4) = -1 instead of -9.
+ */
+static void test_parser_slice_3_looser_operator_after_tighter(void) {
+    check_returned_expression_dump("1 - 2 * 3 - 4", "(- (- 1 (* 2 3)) 4)");
+    check_returned_expression_dump("1 + 2 * 3 / 4 - 5", "(- (+ 1 (/ (* 2 3) 4)) 5)");
+}
+/** Operators of the same precedence group to the left, the mixed ones included. */
+static void test_parser_slice_3_left_associativity(void) {
+    check_returned_expression_dump("1 - 2 - 3", "(- (- 1 2) 3)");
+    check_returned_expression_dump("1 - 2 + 3", "(+ (- 1 2) 3)");
+    check_returned_expression_dump("1 + 2 - 3", "(- (+ 1 2) 3)");
+    check_returned_expression_dump("8 / 4 / 2", "(/ (/ 8 4) 2)");
+    check_returned_expression_dump("8 / 4 * 2", "(* (/ 8 4) 2)");
+    check_returned_expression_dump("7 % 4 % 2", "(% (% 7 4) 2)");
+    check_returned_expression_dump("1 - 2 - 3 - 4", "(- (- (- 1 2) 3) 4)");
+}
+/** A unary operator takes one operand only, on either side of a binary operator: "-1 + 2" is not -(1 + 2). */
+static void test_parser_slice_3_unary_binds_tighter(void) {
+    check_returned_expression_dump("-1 + 2", "(+ (- 1) 2)");
+    check_returned_expression_dump("1 + -2", "(+ 1 (- 2))");
+    check_returned_expression_dump("-1 * -2", "(* (- 1) (- 2))");
+    check_returned_expression_dump("1 - -2", "(- 1 (- 2))");
+    check_returned_expression_dump("1 + +2", "(+ 1 (+ 2))");
+    check_returned_expression_dump("!1 + 2", "(+ (! 1) 2)");
+    check_returned_expression_dump("~1 * 2", "(* (~ 1) 2)");
+    check_returned_expression_dump("- -1 + 2", "(+ (- (- 1)) 2)");
+}
+/** Parentheses override precedence and associativity, and produce no node. */
+static void test_parser_slice_3_parentheses(void) {
+    check_returned_expression_dump("-(1 + 2)", "(- (+ 1 2))");
+    check_returned_expression_dump("(1 + 2) * 3", "(* (+ 1 2) 3)");
+    check_returned_expression_dump("3 * (1 + 2)", "(* 3 (+ 1 2))");
+    check_returned_expression_dump("1 - (2 - 3)", "(- 1 (- 2 3))");
+    check_returned_expression_dump("((1 + 2))", "(+ 1 2)");
+    check_returned_expression_dump("(-1 + 2) * -(3)", "(* (+ (- 1) 2) (- 3))");
+}
+/** "1 / 0", "1 % 0": a zero divisor isn't a syntax error. */
+static void test_parser_slice_3_division_by_zero_parses(void) {
+    check_returned_expression_dump("1 / 0", "(/ 1 0)");
+    check_returned_expression_dump("1 % 0", "(% 1 0)");
+}
+/** A binary expression's range spans its left operand's start to its right operand's end, parentheses included. */
+static void test_parser_slice_3_ranges(void) {
+    check_returned_expression_range("1 + 2", 5);
+    check_returned_expression_range("1 + 2 * 3", 9);
+    check_returned_expression_range("1 - 2 - 3", 9);
+    check_returned_expression_range("-1 + 2", 6);
+    check_returned_expression_range("(1 + 2) * 3", 11);
+    check_returned_expression_range("3 * (1 + 2)", 11);
+    check_returned_expression_range("-(1 + 2)", 8);
+}
+/** "int main(void) { return 1 + 2 * 3; }": slice 3's example program. */
+static void test_parser_slice_3_program(void) {
+    const ParseFixture fixture = parse_fixture_create("int main(void) { return 1 + 2 * 3; }");
+
+    check_dump(&fixture, parser_parse(fixture.parser),
+        "(translation-unit (function-definition main:int(void) (parameters) (block (return (+ 1 (* 2 3))))))");
+    CHECK(has_no_diagnostics(&fixture));
+
+    parse_fixture_destroy(fixture);
+}
+/** Everything slice 3 has, together, as it would sit in a file. */
+static void test_parser_slice_3_whole_program(void) {
+    const ParseFixture fixture = parse_fixture_create(
+        "int helper(void) {\n"
+        "    return 10 - 3 - 2;\n"
+        "}\n"
+        "\n"
+        "int main(void) {\n"
+        "    return -(1 + 2) * 3 % 4;\n"
+        "}\n");
+
+    check_dump(&fixture, parser_parse(fixture.parser),
+        "(translation-unit"
+        " (function-definition helper:int(void) (parameters) (block (return (- (- 10 3) 2))))"
+        " (function-definition main:int(void) (parameters) (block (return (% (* (- (+ 1 2)) 3) 4)))))");
+    CHECK(has_no_diagnostics(&fixture));
+
+    parse_fixture_destroy(fixture);
+}
+
+// Errors. "* 2" stays out: it is valid from slice 11 (dereference), so its expectation would flip.
+
+/** "int main(void) { return 1 +; }" and "... 1 *; }": no right operand. Reported at the ';', offset 27. */
+static void test_parser_slice_3_error_missing_right_operand(void) {
+    check_parse_fails("int main(void) { return 1 +; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 27);
+    check_parse_fails("int main(void) { return 1 *; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 27);
+}
+/** "int main(void) { return / 2; }" and "... % 2; }": '/' and '%' are never prefix. Reported at them, offset 24. */
+static void test_parser_slice_3_error_missing_left_operand(void) {
+    check_parse_fails("int main(void) { return / 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+    check_parse_fails("int main(void) { return % 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 24);
+}
+/** "int main(void) { return 1 / / 2; }": two binary operators in a row. Reported at the second, offset 28. */
+static void test_parser_slice_3_error_two_binary_operators(void) {
+    check_parse_fails("int main(void) { return 1 / / 2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+}
+/** "int main(void) { return 1 2; }" and "... 1 + 2 3; }": no operator between two operands. A ';' is expected there. */
+static void test_parser_slice_3_error_missing_operator(void) {
+    check_parse_fails("int main(void) { return 1 2; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 26);
+    check_parse_fails("int main(void) { return 1 + 2 3; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 30);
+}
+/** "int main(void) { return 1 + ); }": a ')' where the right operand should be. Reported at it, offset 28. */
+static void test_parser_slice_3_error_right_parenthesis_as_operand(void) {
+    check_parse_fails("int main(void) { return 1 + ); }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+}
+/** "int main(void) { return (1 + 2; }": the ')' is missing. Reported at the ';', offset 30. */
+static void test_parser_slice_3_error_unclosed_parenthesis(void) {
+    check_parse_fails("int main(void) { return (1 + 2; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 30);
+}
+/**
+ * "int main(void) { return 1--2; }" and "... 1++2; }": SUBSET.md A.2.1, a -- or ++ token isn't a binary operator, so
+ * a ';' is expected at it, offset 25. "1 - --2" reports the -- as the right operand, offset 28.
+ */
+static void test_parser_slice_3_error_minus_minus_and_plus_plus(void) {
+    check_parse_fails("int main(void) { return 1--2; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 25);
+    check_parse_fails("int main(void) { return 1++2; }", DIAGNOSTIC_CODE_PARSER_EXPECTED_TOKEN, 25);
+    check_parse_fails("int main(void) { return 1 - --2; }", DIAGNOSTIC_CODE_PARSER_INVALID_EXPRESSION, 28);
+}
+
 int main(const int argc, char** const argv) {
     harness_init(argc, argv);
 
@@ -827,6 +984,7 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_parser_slice_2_parentheses);
     RUN_TEST(test_parser_slice_2_unary_and_parentheses);
     RUN_TEST(test_parser_slice_2_unary_ranges);
+    RUN_TEST(test_parser_slice_2_parentheses_ranges);
     RUN_TEST(test_parser_slice_2_program);
     RUN_TEST(test_parser_slice_2_whole_program);
 
@@ -839,6 +997,26 @@ int main(const int argc, char** const argv) {
     RUN_TEST(test_parser_slice_2_error_missing_operand_in_parentheses);
     RUN_TEST(test_parser_slice_2_error_unclosed_parenthesis_after_operator);
     RUN_TEST(test_parser_slice_2_error_operator_after_operand);
+
+    RUN_TEST(test_parser_slice_3_each_binary_operator);
+    RUN_TEST(test_parser_slice_3_no_whitespace);
+    RUN_TEST(test_parser_slice_3_precedence);
+    RUN_TEST(test_parser_slice_3_looser_operator_after_tighter);
+    RUN_TEST(test_parser_slice_3_left_associativity);
+    RUN_TEST(test_parser_slice_3_unary_binds_tighter);
+    RUN_TEST(test_parser_slice_3_parentheses);
+    RUN_TEST(test_parser_slice_3_division_by_zero_parses);
+    RUN_TEST(test_parser_slice_3_ranges);
+    RUN_TEST(test_parser_slice_3_program);
+    RUN_TEST(test_parser_slice_3_whole_program);
+
+    RUN_TEST(test_parser_slice_3_error_missing_right_operand);
+    RUN_TEST(test_parser_slice_3_error_missing_left_operand);
+    RUN_TEST(test_parser_slice_3_error_two_binary_operators);
+    RUN_TEST(test_parser_slice_3_error_missing_operator);
+    RUN_TEST(test_parser_slice_3_error_right_parenthesis_as_operand);
+    RUN_TEST(test_parser_slice_3_error_unclosed_parenthesis);
+    RUN_TEST(test_parser_slice_3_error_minus_minus_and_plus_plus);
 
     return harness_finish();
 }

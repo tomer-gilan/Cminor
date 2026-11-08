@@ -1,0 +1,3 @@
+# Written by Claude on 07-Nov-26. Expected exit status of divide_negative_toward_zero.c (see tests/run_e2e.sh).
+# -3 mod 256: division truncates toward zero. Zeroing %edx instead of cltd breaks this.
+253
